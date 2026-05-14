@@ -5,19 +5,19 @@ import datetime
 import urllib.parse
 import requests
 import random
-import google.generativeai as genai
+import time
 from email.mime.text import MIMEText
 
-# ── Secrets (تبديل GROQ بـ GEMINI) ──────────────────────
-GEMINI_KEY   = os.environ.get("GEMINI_API_KEY")
+# ── Secrets (تبديل GROQ بـ Hugging Face) ─────────────────
+HF_TOKEN     = os.environ.get("HF_TOKEN")
 GMAIL_PASS   = os.environ.get("GMAIL_APP_PASSWORD")
 BLOGGER_MAIL = os.environ.get("BLOGGER_EMAIL")
 MY_GMAIL     = os.environ.get("MY_GMAIL")
 PEXELS_KEY   = os.environ.get("PEXELS_API_KEY")
 
-# إعداد Gemini
-genai.configure(api_key=GEMINI_KEY)
-model = genai.GenerativeModel('gemini-1.5-flash')
+# إعدادات الموديل (Llama 3 8B Instruct - سريع ومستقر)
+API_URL = "https://api-inference.huggingface.co/models/meta-llama/Meta-Llama-3-8B-Instruct"
+headers = {"Authorization": f"Bearer {HF_TOKEN}"}
 
 today_date   = datetime.date.today().strftime("%B %d, %Y")
 current_year = 2026
@@ -25,101 +25,101 @@ current_year = 2026
 # ── Topic Rotation System ─────────────────────────────────
 TOPIC_ANGLES = [
     f"the most disruptive NEW AI model released this week in {current_year}",
-    f"a BREAKTHROUGH scientific study published in {current_year} about productivity",
-    f"a revolutionary AI-powered tool for students in {current_year}",
-    f"a major SILICON VALLEY corporate shakeup happening RIGHT NOW in {current_year}",
+    f"a BREAKTHROUGH scientific study about productivity in {current_year}",
+    f"a revolutionary AI tool for students in {current_year}",
     f"the battle between OpenAI vs Google vs Meta in {current_year}",
 ]
 
 random_modifier = random.choice([
-    "Focus on a hidden scandal.",
-    "Write from an insider leak perspective.",
-    "Highlight extreme financial implications.",
-    "Use a high-stakes thriller headline."
+    "Focus on a hidden scandal or controversy.",
+    "Highlight the extreme financial implications.",
+    "Make the title sound like a high-stakes thriller headline."
 ])
 
 chosen_topic = random.choice(TOPIC_ANGLES)
 
-# ── Prompt (بقينا على نفس الستيل ديالك) ──────────────────
-prompt = f"""
-Current Date: {today_date}
-Angle: {random_modifier}
-Story: {chosen_topic}
-
-Write an investigative article (Minimum 1100 words for Google Ads SEO). 
-Structure MUST use tags: [TITLE], [KEYWORDS], [META], [CONTENT].
-Inside [CONTENT], use ONLY HTML tags like <p>, <h2>, <h3>, <strong>, <em>.
-Be very detailed, invent specific names, and use a professional journalist tone.
-"""
+# ── Prompt ───────────────────────────────────────────────
+# زدنا تعليمات باش الموديل يكمل المقال وما يحبسش
+prompt = f"<|begin_of_text|><|start_header_id|>user<|end_header_id|>\n\nCurrent Date: {today_date}\nAngle: {random_modifier}\nStory: {chosen_topic}\n\nWrite an investigative article (Min 1000 words). \nStructure: [TITLE], [KEYWORDS], [META], [CONTENT] (using only HTML tags like <p>, <h2>, <strong>).\n\nFocus on technical depth and exclusive leaks.<|eot_id|><|start_header_id|>assistant<|end_header_id|>\n\n"
 
 # ── Robust Parser ────────────────────────────────────────
 def parse_response(raw):
-    # تنظيف الماركداون إذا وجد
-    clean_raw = raw.replace('**', '').replace('#', '')
+    # تنظيف الرد من الـ Tags ديال Llama 3
+    raw_clean = re.sub(r'<\|.*?\|>', '', raw)
+    raw_clean = re.sub(r'[*#]', '', raw_clean)
     
-    title = re.search(r"\[TITLE\]\s*(.*)", clean_raw, re.IGNORECASE)
-    kw = re.search(r"\[KEYWORDS\]\s*(.*)", clean_raw, re.IGNORECASE)
-    meta = re.search(r"\[META\]\s*(.*)", clean_raw, re.IGNORECASE)
-    content = re.search(r"\[CONTENT\]\s*(.*)", raw, re.DOTALL | re.IGNORECASE)
+    title_match = re.search(r"\[TITLE\]\s*(.*)", raw_clean, re.IGNORECASE)
+    kw_match    = re.search(r"\[KEYWORDS\]\s*(.*)", raw_clean, re.IGNORECASE)
+    meta_match  = re.search(r"\[META\]\s*(.*)", raw_clean, re.IGNORECASE)
+    content_match = re.search(r"\[CONTENT\]\s*(.*)", raw_clean, re.DOTALL | re.IGNORECASE)
 
-    res_title = title.group(1).split('[')[0].strip() if title else f"Tech Insights {today_date}"
-    res_kw = kw.group(1).split('[')[0].strip() if kw else "tech, innovation"
-    res_meta = meta.group(1).split('[')[0].strip()[:160] if meta else "Exclusive deep-dive."
-    
-    if content:
-        res_content = content.group(1).strip()
+    title = title_match.group(1).split('[')[0].strip() if title_match else f"Tech Update {today_date}"
+    keywords = kw_match.group(1).split('[')[0].strip() if kw_match else "tech, ai"
+    meta_desc = meta_match.group(1).split('[')[0].strip()[:160] if meta_match else "Deep dive analysis."
+
+    if content_match:
+        content = content_match.group(1).strip()
     else:
-        res_content = raw.split('[CONTENT]')[-1] if '[CONTENT]' in raw else raw
+        # البحث عن أول وسم HTML
+        html_start = re.search(r"(<p>|<h2>).*", raw_clean, re.DOTALL | re.IGNORECASE)
+        content = html_start.group(0) if html_start else raw_clean
 
-    res_content = re.sub(r'```.*?```', '', res_content, flags=re.DOTALL)
-    return res_title[:65], res_kw, res_meta, res_content
+    return title[:65], keywords, meta_desc, content
 
-# ── Content Generation (Gemini Edition) ──────────────────
+# ── Content Generation (Hugging Face) ─────────────────────
 def generate_content():
     try:
-        response = model.generate_content(prompt)
-        if response.text:
-            return parse_response(response.text)
-        return None, None, None, None
+        # Hugging Face كيحتاج payload خاص
+        payload = {
+            "inputs": prompt,
+            "parameters": {
+                "max_new_tokens": 2500, # باش يعطينا مقال طويل
+                "temperature": 0.7,
+                "top_p": 0.9,
+                "return_full_text": False
+            }
+        }
+        
+        response = requests.post(API_URL, headers=headers, json=payload, timeout=120)
+        
+        if response.status_code == 200:
+            result = response.json()
+            # Hugging Face كيرجع List
+            raw_text = result[0]['generated_text'] if isinstance(result, list) else result['generated_text']
+            return parse_response(raw_text)
+        elif response.status_code == 503:
+            print("⏳ Model is loading on Hugging Face, waiting 20s...")
+            time.sleep(20)
+            return generate_content() # إعادة المحاولة
+        else:
+            print(f"❌ HF Error: {response.status_code} - {response.text}")
+            return None, None, None, None
     except Exception as e:
-        print(f"❌ Gemini Error: {e}")
+        print(f"❌ Generation Error: {e}")
         return None, None, None, None
 
-# ── Pexels Image ──────────────────────────────────────────
+# ── Pexels & Email (نفس الكود ديالك بلا تغيير) ─────────────
 def get_best_pexels_image(keywords):
     if not PEXELS_KEY: return "https://picsum.photos/1200/630"
-    headers = {"Authorization": PEXELS_KEY}
     try:
         url = f"https://api.pexels.com/v1/search?query={urllib.parse.quote(keywords)}&per_page=1"
-        res = requests.get(url, headers=headers, timeout=15).json()
+        res = requests.get(url, headers={"Authorization": PEXELS_KEY}, timeout=10).json()
         return res["photos"][0]["src"]["large2x"] if res.get("photos") else "https://picsum.photos/1200/630"
-    except:
-        return "https://picsum.photos/1200/630"
+    except: return "https://picsum.photos/1200/630"
 
-# ── Final Main Function ───────────────────────────────────
 def main():
-    print("🚀 Starting Gemini-Powered Blogger Bot...")
+    print("🚀 Starting HF-Powered Bot...")
     title, keywords, meta, content = generate_content()
     
-    if title and len(content) > 800:
-        image_url = get_best_pexels_image(keywords)
-        
-        full_html = f"""
-        <div dir="ltr" style="font-family: 'Segoe UI', Tahoma, sans-serif; line-height: 1.8; color: #1a1a1a; max-width: 800px; margin: auto;">
-            <div style="text-align: center; margin-bottom: 30px;">
-                <img src="{image_url}" style="width: 100%; border-radius: 10px; box-shadow: 0 4px 10px rgba(0,0,0,0.1);" alt="{title}">
-            </div>
-            <div style="text-align: justify; font-size: 19px;">
-                {content}
-            </div>
-            <hr style="margin-top: 50px; border: 0; border-top: 1px solid #eee;">
-            <p style="text-align: center; color: #888; font-size: 13px;">
-                © {current_year} Smart Flow Lab Intelligence. All Rights Reserved.
-            </p>
+    if title and len(content) > 600:
+        img = get_best_pexels_image(keywords)
+        html = f"""
+        <div dir="ltr" style="font-family: Arial; line-height: 1.8; font-size: 18px; color: #333;">
+            <img src="{img}" style="width: 100%; border-radius: 8px;" alt="{title}">
+            <div style="margin-top: 20px;">{content}</div>
         </div>
         """
-        
-        msg = MIMEText(full_html, 'html', 'utf-8')
+        msg = MIMEText(html, 'html', 'utf-8')
         msg['Subject'] = title
         msg['From'] = MY_GMAIL
         msg['To'] = BLOGGER_MAIL
@@ -128,11 +128,10 @@ def main():
             with smtplib.SMTP_SSL('smtp.gmail.com', 465) as server:
                 server.login(MY_GMAIL, GMAIL_PASS)
                 server.send_message(msg)
-            print(f"✅ Published: {title}")
-        except Exception as e:
-            print(f"❌ Email Error: {e}")
+            print(f"✅ Published to Blogger: {title}")
+        except Exception as e: print(f"❌ Email Error: {e}")
     else:
-        print("❌ Script stopped: Content too short or Generation failed.")
+        print("❌ Generation failed or content too short.")
 
 if __name__ == "__main__":
     main()
