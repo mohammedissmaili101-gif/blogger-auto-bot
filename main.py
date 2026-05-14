@@ -9,11 +9,13 @@ from email.mime.text import MIMEText
 from groq import Groq
 
 # ── Secrets ──────────────────────────────────────────────
-GROQ_KEY     = os.environ.get("GROQ_API_KEY")
-GMAIL_PASS   = os.environ.get("GMAIL_APP_PASSWORD")
-BLOGGER_MAIL = os.environ.get("BLOGGER_EMAIL")
-MY_GMAIL     = os.environ.get("MY_GMAIL")
-PEXELS_KEY   = os.environ.get("PEXELS_API_KEY")
+GROQ_KEY      = os.environ.get("GROQ_API_KEY")
+GMAIL_PASS    = os.environ.get("GMAIL_APP_PASSWORD")
+BLOGGER_MAIL  = os.environ.get("BLOGGER_EMAIL")
+MY_GMAIL      = os.environ.get("MY_GMAIL")
+PEXELS_KEY    = os.environ.get("PEXELS_API_KEY")
+SENDER_GMAIL  = os.environ.get("SENDER_GMAIL")       # الإيميل الجديد المرسل
+SENDER_PASS   = os.environ.get("SENDER_GMAIL_PASS")  # App Password ديالو
 
 client       = Groq(api_key=GROQ_KEY)
 today_date   = datetime.date.today().strftime("%B %d, %Y")
@@ -464,12 +466,12 @@ def build_html(title, meta_desc, image_url, article_body):
 def send_email(title, html_body):
     msg            = MIMEText(html_body, 'html', 'utf-8')
     msg['Subject'] = title
-    msg['From']    = MY_GMAIL
+    msg['From']    = SENDER_GMAIL
     msg['To']      = BLOGGER_MAIL
 
     try:
         with smtplib.SMTP_SSL('smtp.gmail.com', 465, timeout=30) as server:
-            server.login(MY_GMAIL, GMAIL_PASS)
+            server.login(SENDER_GMAIL, SENDER_PASS)
             server.send_message(msg)
         print(f"✅ Published: {title}")
     except smtplib.SMTPAuthenticationError:
