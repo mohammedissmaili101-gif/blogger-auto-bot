@@ -19,135 +19,189 @@ client       = Groq(api_key=GROQ_KEY)
 today_date   = datetime.date.today().strftime("%B %d, %Y")
 current_year = datetime.date.today().year
 
+# ── Topic Rotation System ─────────────────────────────────
+# تم تحسين الزوايا لتكون أكثر انفتاحاً على خيال الذكاء الاصطناعي
 TOPIC_ANGLES = [
-    "The 'Flow-State' Hack: How AI agents automate deep-work in 2026",
-    "Beyond ChatGPT: The rise of Autonomous Productivity OS",
-    "Micro-SaaS Productivity: Build a $10k/month business with AI",
-    "The Death of Search: Why AI-Integrated Browsers are the future",
-    "AI-Driven Time Boxing: Why traditional To-Do lists are obsolete",
-    "The 4-Hour Work Week 2.0: Replacing manual data entry with AI",
-    "Personal Knowledge Management: Building a digital second brain",
-    "The Productivity Crisis: Consolidating AI tools into one workflow",
-    "Voice-to-Action: Turning messy voice notes into project plans",
-    "The Ultimate AI Stack for Solopreneurs in 2026"
+    "a disruptive NEW AI model benchmark leak that is crushing OpenAI and Google",
+    "a BREAKTHROUGH neuro-tech study from a top-tier lab that links AI to human cognition",
+    "a revolutionary AI student tool that is making traditional exams obsolete",
+    "a massive Silicon Valley boardroom coup or acquisition involving a major AI player",
+    "a landmark AI achievement in curing a specific disease or solving a climate crisis",
+    "the brutal 'LLM Cold War' between two specific tech giants with exclusive leak details",
+    "how a new AI-automated coding platform is making human junior developers redundant",
+    "a viral AI consumer trend that is reshaping social interaction or digital identity",
 ]
 
+# إضافة "نكهة" عشوائية لضمان عدم تكرار العناوين نهائياً
+RANDOM_FLAVORS = ["Investigative Report", "Special Leak", "Industry Analysis", "Exclusive Deep-Dive", "Inside Story"]
 chosen_topic = random.choice(TOPIC_ANGLES)
+chosen_flavor = random.choice(RANDOM_FLAVORS)
 
+# ── Prompt ───────────────────────────────────────────────
+# تم تعديل الـ Prompt ليجبر الذكاء الاصطناعي على ابتكار عناوين فريدة ومحددة
 prompt = f"""
 Current Date: {today_date}
-Role: Senior Tech Journalist for Smart Flow Lab.
-Task: Write a deep-dive technical article (1000+ words) about: {chosen_topic}
+Story Focus Style: {chosen_flavor}
 
-Required Structure (STRICT):
-[TITLE] Headline
-[KEYWORDS] search terms
-[META] short description
+You are a Pulitzer Prize-winning investigative tech journalist. 
+YOUR ASSIGNED STORY: Write an EXCLUSIVE story about: {chosen_topic} in {current_year}.
+
+ABSOLUTE TITLE RULES:
+- The title must be unique, punchy, and highly specific.
+- ALWAYS include a fictional or real company name, person, or specific tech-model name in the title.
+- NEVER use generic titles like "The Future of AI" or "AI in 2026".
+- Use 'action' verbs and high-stakes language (e.g., 'Shatters', 'Betrayal', 'Coup', 'Unveiled', 'Crisis').
+- The title must feel like it belongs on the front page of The New York Times or Wired.
+- Under 65 characters, no symbols.
+
+ABSOLUTE CONTENT RULES:
+1. NO generic advice or how-to lists.
+2. Invent realistic, specific details: quotes, study figures, and recent (fictional) events.
+3. Vary sentence length. Hook the reader in the first paragraph.
+4. Minimum 900 words. Maximum 1200 words.
+
+STRUCTURE REQUIRED (use these exact HTML tags):
+- One powerful <p> opening hook
+- Then alternate: <h2> section heading → 2-3 <p> paragraphs
+- Use <blockquote> for expert quotes, <strong> for terms, <em> for emphasis.
+- End with a forward-looking <h2> conclusion.
+
+CRITICAL FORMATTING:
+[TITLE] your unique headline
+[KEYWORDS] your keywords here
+[META] your meta description here
 [CONTENT]
-Full HTML body with <h2>, <p>, <strong>. No markdown blocks.
+your full HTML article here
 """
 
+# ── Robust Parser ────────────────────────────────────────
 def parse_response(raw):
-    """نظام تحليل مرن جداً لتجنب الفشل"""
-    try:
-        # استخراج الأجزاء مع مراعاة وجود Markdown (مثل **[TITLE]**)
-        title = re.search(r"TITLE\]?[:\s]*(.*)", raw, re.IGNORECASE)
-        keywords = re.search(r"KEYWORDS\]?[:\s]*(.*)", raw, re.IGNORECASE)
-        meta = re.search(r"META\]?[:\s]*(.*)", raw, re.IGNORECASE)
-        
-        # تقسيم المحتوى بذكاء
-        content_split = re.split(r"CONTENT\]?", raw, flags=re.IGNORECASE)
-        content = content_split[-1].strip() if len(content_split) > 1 else raw
+    normalized = re.sub(r'\[\s*(TITLE|KEYWORDS|META|CONTENT)\s*\]', lambda m: f'[{m.group(1).upper()}]', raw, flags=re.IGNORECASE)
+    normalized = re.sub(r'\[CONTENT[:\s]*\]', '[CONTENT]', normalized, flags=re.IGNORECASE)
 
-        # تنظيف العناوين
-        clean_title = re.sub(r'[#*\[\]]', '', title.group(1)).strip() if title else chosen_topic
-        clean_kw = re.sub(r'[#*\[\]]', '', keywords.group(1)).strip() if keywords else "productivity AI"
-        clean_meta = meta.group(1).strip() if meta else "Smart Flow Lab Deep Dive."
-        
-        # إزالة أي أكواد ماركداون (```html) قد يضيفها البوت
-        content = re.sub(r'```[a-z]*', '', content).replace('```', '').strip()
-        
-        return clean_title, clean_kw, clean_meta, content
-    except Exception as e:
-        print(f"⚠️ Parsing recovery mode: {e}")
-        return chosen_topic, "productivity", "AI tech update", raw
+    title_match   = re.search(r"\[TITLE\](.*?)(?=\[KEYWORDS\]|\[META\]|\[CONTENT\]|$)", normalized, re.DOTALL)
+    kw_match      = re.search(r"\[KEYWORDS\](.*?)(?=\[META\]|\[CONTENT\]|\[TITLE\]|$)", normalized, re.DOTALL)
+    meta_match    = re.search(r"\[META\](.*?)(?=\[CONTENT\]|\[TITLE\]|\[KEYWORDS\]|$)", normalized, re.DOTALL)
+    content_match = re.search(r"\[CONTENT\](.*)", normalized, re.DOTALL)
 
+    if not content_match:
+        html_match = re.search(r'(<(?:p|h2|h3|blockquote)[^>]*>.*)', normalized, re.DOTALL | re.IGNORECASE)
+        content_raw = html_match.group(1) if html_match else ""
+    else:
+        content_raw = content_match.group(1)
+
+    # تحسين العنوان في حالة الفشل في الاستخراج (Fallback) ليكون عشوائياً أيضاً
+    fallback_titles = [
+        f"The {current_year} {chosen_flavor}: A Tech Revolution Unveiled",
+        f"Exclusive: Inside the {chosen_topic[:20]} Shaking the Industry",
+        f"Smart Flow Lab Special Report: The {current_year} Pivot"
+    ]
+    title = title_match.group(1).strip() if title_match else random.choice(fallback_titles)
+    
+    keywords = kw_match.group(1).strip() if kw_match else "technology innovation bright"
+    meta_raw = meta_match.group(1).strip() if meta_match else f"Exclusive analysis on {chosen_topic}."
+
+    title = re.sub(r'[#*`]', '', title).strip()
+    title = re.sub(r'^[\s\-:]+|[\s\-:]+$', '', title).strip()
+    meta_desc = meta_raw[:160].strip()
+
+    content = content_raw.strip()
+    content = re.sub(r'```[\w]*|
+```', '', content)
+    content = re.sub(r'##\s+(.*?)(\n|$)', r'<h2>\1</h2>', content)
+    content = re.sub(r'\*\*(.*?)\*\*', r'<strong>\1</strong>', content)
+    content = re.sub(r'\*(.*?)\*', r'<em>\1</em>', content)
+
+    return title, keywords, meta_desc, content
+
+# ── Content Generation (with retry) ──────────────────────
+def generate_content(max_retries=3):
+    for attempt in range(1, max_retries + 1):
+        print(f"🤖 AI attempt {attempt}/{max_retries}...")
+        try:
+            completion = client.chat.completions.create(
+                messages=[{"role": "user", "content": prompt}],
+                model="llama-3.3-70b-versatile",
+                temperature=0.85, # زيادة طفيفة في الـ temperature للإبداع
+                max_tokens=4096,
+            )
+            raw = completion.choices[0].message.content
+            result = parse_response(raw)
+            if result[0] is not None and len(result[3]) > 500:
+                return result
+            print(f"⚠️ Attempt {attempt} failed or content too short. Retrying...")
+        except Exception as e:
+            print(f"❌ API error: {e}")
+    return None, None, None, None
+
+# ── Pexels Image ─────────────────────────────────────────
 def get_best_pexels_image(keywords):
-    fallback = f"[https://picsum.photos/seed/](https://picsum.photos/seed/){random.randint(1,999)}/1200/630"
-    if not PEXELS_KEY: return fallback
-    try:
-        query = urllib.parse.quote(keywords)
-        res = requests.get(f"[https://api.pexels.com/v1/search?query=](https://api.pexels.com/v1/search?query=){query}&per_page=1", 
-                          headers={"Authorization": PEXELS_KEY}, timeout=10)
-        data = res.json()
-        return data["photos"][0]["src"]["large2x"] if data.get("photos") else fallback
-    except:
-        return fallback
+    fallback_keywords = [keywords, "technology innovation bright", "digital future"]
+    if not PEXELS_KEY:
+        return f"https://picsum.photos/seed/{random.randint(1,9999)}/1200/628"
+    headers = {"Authorization": PEXELS_KEY}
+    for kw in fallback_keywords:
+        try:
+            url = f"https://api.pexels.com/v1/search?query={urllib.parse.quote(kw)}&per_page=10&orientation=landscape"
+            res = requests.get(url, headers=headers, timeout=10)
+            data = res.json()
+            photos = data.get("photos", [])
+            if photos: return random.choice(photos)["src"]["large2x"]
+        except: continue
+    return f"https://picsum.photos/seed/{random.randint(1,9999)}/1200/628"
 
+# ── Magazine-Quality HTML Builder ────────────────────────
 def build_html(title, meta_desc, image_url, article_body):
+    title_safe = title.replace('"', '&quot;')
+    meta_safe  = meta_desc.replace('"', '&quot;')
     return f"""<!DOCTYPE html>
 <html lang="en">
 <head>
 <meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<meta name="description" content="{meta_safe}">
 <style>
-  body {{ font-family: 'Helvetica Neue', Helvetica, Arial, sans-serif; line-height: 1.8; color: #1a1a1a; max-width: 850px; margin: auto; padding: 30px; background: #fefefe; }}
-  .header {{ text-align: center; border-bottom: 3px solid #3498db; margin-bottom: 40px; padding-bottom: 20px; }}
-  h1 {{ font-size: 42px; margin-bottom: 10px; color: #2c3e50; line-height: 1.2; }}
-  .meta-info {{ color: #7f8c8d; font-style: italic; margin-bottom: 20px; }}
-  .hero-img {{ width: 100%; border-radius: 12px; margin-bottom: 35px; box-shadow: 0 10px 20px rgba(0,0,0,0.1); }}
-  h2 {{ color: #2980b9; margin-top: 45px; font-size: 28px; border-left: 6px solid #3498db; padding-left: 15px; }}
-  p {{ margin-bottom: 25px; font-size: 19px; }}
-  blockquote {{ background: #f8f9fa; border-left: 8px solid #bdc3c7; padding: 20px; margin: 30px 0; font-style: italic; font-size: 21px; }}
-  .footer {{ margin-top: 60px; padding: 30px; background: #2c3e50; color: white; border-radius: 8px; text-align: center; }}
+  body {{ font-family: 'Source Serif 4', Georgia, serif; background: #fafaf8; color: #0d0d0d; font-size: 19px; line-height: 1.75; margin:0; }}
+  .top-bar {{ background: #0d0d0d; color: #fff; text-align: center; padding: 10px; font-family: sans-serif; font-size: 11px; letter-spacing: 0.2em; text-transform: uppercase; }}
+  .article-wrap {{ max-width: 740px; margin: 0 auto; padding: 40px 24px; }}
+  h1 {{ font-family: 'Playfair Display', serif; font-size: 48px; line-height: 1.1; margin-bottom: 20px; }}
+  .featured-image {{ width: 100%; max-height: 480px; object-fit: cover; margin-bottom: 30px; }}
+  .content p:first-of-type::first-letter {{ font-size: 72px; float: left; line-height: 0.8; margin-right: 8px; color: #c0392b; }}
+  h2 {{ border-bottom: 2px solid #0d0d0d; padding-bottom: 10px; margin-top: 40px; }}
+  blockquote {{ border-left: 4px solid #c0392b; background: #fff8f7; padding: 20px; font-style: italic; font-size: 20px; }}
 </style>
 </head>
 <body>
-  <div class="header">
-    <h1>{title}</h1>
-    <div class="meta-info">By Smart Flow Editorial Team • Updated {today_date}</div>
-  </div>
-  <img src="{image_url}" class="hero-img" alt="Productivity Trends">
-  <div class="main-content">
-    {article_body}
-  </div>
-  <div class="footer">
-    © {current_year} Smart Flow Lab. Empowering workflows through AI.
-  </div>
+<div class="top-bar">Smart Flow Lab | {today_date}</div>
+<article class="article-wrap">
+  <h1>{title}</h1>
+  <img src="{image_url}" class="featured-image">
+  <div class="content">{article_body}</div>
+</article>
 </body>
 </html>"""
 
+# ── Send Email ────────────────────────────────────────────
 def send_email(title, html_body):
     msg = MIMEText(html_body, 'html', 'utf-8')
     msg['Subject'] = title
     msg['From'] = MY_GMAIL
     msg['To'] = BLOGGER_MAIL
-    with smtplib.SMTP_SSL('smtp.gmail.com', 465) as server:
-        server.login(MY_GMAIL, GMAIL_PASS)
-        server.send_message(msg)
+    try:
+        with smtplib.SMTP_SSL('smtp.gmail.com', 465) as server:
+            server.login(MY_GMAIL, GMAIL_PASS)
+            server.send_message(msg)
+        print(f"✅ Published: {title}")
+    except Exception as e: print(f"❌ Error: {e}")
+
+# ── Main ──────────────────────────────────────────────────
+def main():
+    print(f"📌 Today's Angle: {chosen_topic}")
+    title, keywords, meta_desc, article_body = generate_content()
+    if title and article_body:
+        image_url = get_best_pexels_image(keywords)
+        full_html = build_html(title, meta_desc, image_url, article_body)
+        send_email(title, full_html)
 
 if __name__ == "__main__":
-    print("🚀 Smart Flow Automation Started...")
-    try:
-        # محاولة التوليد
-        response = client.chat.completions.create(
-            messages=[{"role": "user", "content": prompt}],
-            model="llama-3.3-70b-versatile",
-            temperature=0.7,
-            max_tokens=4000
-        )
-        raw_text = response.choices[0].message.content
-        
-        # التحليل
-        t, k, m, body = parse_response(raw_text)
-        
-        # التأكد من وجود محتوى حتى لو فشل الـ parser
-        if len(body) < 100:
-            raise ValueError("Content too short, AI lazy response.")
-
-        img = get_best_pexels_image(k)
-        html = build_html(t, m, img, body)
-        send_email(t, html)
-        print(f"✅ Success! Published: {t}")
-        
-    except Exception as e:
-        print(f"❌ Final Critical Error: {e}")
+    main()
