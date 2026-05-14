@@ -78,33 +78,40 @@ your full HTML article here using ONLY <p>, <h2>, <h3>, <strong>, <em>, <blockqu
 
 # ── Robust Parser ────────────────────────────────────────
 def parse_response(raw):
-    normalized = re.sub(
-        r'\[\s*(TITLE|KEYWORDS|META|CONTENT)\s*\]',
-        lambda m: f'[{m.group(1).upper()}]',
-        raw, flags=re.IGNORECASE
-    )
-    normalized = re.sub(r'\[CONTENT[:\s]*\]', '[CONTENT]', normalized, flags=re.IGNORECASE)
+    # تنظيف النص من أي علامات Markdown قد تعيق البحث عن العناوين
+    raw_clean = raw.replace('**', '').replace('#', '')
 
-    title_match   = re.search(r"\[TITLE\](.*?)(?=\[KEYWORDS\]|\[META\]|\[CONTENT\]|$)", normalized, re.DOTALL)
-    kw_match      = re.search(r"\[KEYWORDS\](.*?)(?=\[META\]|\[CONTENT\]|\[TITLE\]|$)", normalized, re.DOTALL)
-    meta_match    = re.search(r"\[META\](.*?)(?=\[CONTENT\]|\[TITLE\]|\[KEYWORDS\]|$)", normalized, re.DOTALL)
-    content_match = re.search(r"\[CONTENT\](.*)", normalized, re.DOTALL)
+    # محاولة البحث عن الأقسام
+    title_match = re.search(r"\[TITLE\]\s*(.*)", raw_clean, re.IGNORECASE)
+    kw_match    = re.search(r"\[KEYWORDS\]\s*(.*)", raw_clean, re.IGNORECASE)
+    meta_match  = re.search(r"\[META\]\s*(.*)", raw_clean, re.IGNORECASE)
+    content_match = re.search(r"\[CONTENT\]\s*(.*)", raw, re.DOTALL | re.IGNORECASE)
 
-    if not content_match:
-        html_match = re.search(r'(<(?:p|h2|h3|blockquote)[^>]*>.*)', normalized, re.DOTALL | re.IGNORECASE)
-        content_raw = html_match.group(1) if html_match else ""
+    # 1. استخراج العنوان
+    title = ""
+    if title_match:
+        title = title_match.group(1).split('[')[0].strip()
+    
+    # Plan B للعنوان: إذا فشل البحث، نأخذ أول سطر مفيد
+    if not title or len(title) < 5:
+        lines = [l.strip() for l in raw_clean.split('\n') if len(l.strip()) > 10 and not l.startswith('[')]
+        title = lines[0] if lines else f"Tech Insights {current_year}"
+
+    # تنظيف نهائي للعنوان
+    title = re.sub(r'[^\w\s\-\!\?]', '', title)[:65].strip()
+
+    # 2. استخراج الكلمات المفتاحية والميتا
+    keywords = kw_match.group(1).split('[')[0].strip() if kw_match else "tech, innovation, ai"
+    meta_desc = meta_match.group(1).split('[')[0].strip()[:160] if meta_match else f"Exclusive analysis for {current_year}."
+
+    # 3. استخراج المحتوى
+    if content_match:
+        content = content_match.group(1).strip()
     else:
-        content_raw = content_match.group(1)
+        html_start = re.search(r"(<p>|<h2>).*", raw, re.DOTALL | re.IGNORECASE)
+        content = html_start.group(0) if html_start else raw
 
-    title    = title_match.group(1).strip()  if title_match else "Exclusive Report: The Future of Innovation"
-    keywords = kw_match.group(1).strip()     if kw_match   else "tech, innovation, ai"
-    meta_raw = meta_match.group(1).strip()   if meta_match else f"Exclusive analysis for {current_year}."
-
-    title = re.sub(r'[#*`]', '', title).strip()
-    title = re.sub(r'^[\s\-:]+|[\s\-:]+$', '', title).strip()
-    meta_desc = meta_raw[:160].strip()
-
-    content = content_raw.strip()
+    # 4. تنظيف المحتوى (الاحتفاظ بالتنظيف الأصلي لضمان عدم تخريب HTML)
     content = re.sub(r'```[\w]*|```', '', content)
     content = re.sub(r'##\s+(.*?)(\n|$)', r'<h2>\1</h2>', content)
     content = re.sub(r'\*\*(.*?)\*\*', r'<strong>\1</strong>', content)
