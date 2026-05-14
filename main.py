@@ -5,18 +5,20 @@ import datetime
 import urllib.parse
 import requests
 import random
-import time
+import google.generativeai as genai
 from email.mime.text import MIMEText
-from groq import Groq
 
-# ── Secrets ──────────────────────────────────────────────
-GROQ_KEY     = os.environ.get("GROQ_API_KEY")
+# ── Secrets (تبديل GROQ بـ GEMINI) ──────────────────────
+GEMINI_KEY   = os.environ.get("GEMINI_API_KEY")
 GMAIL_PASS   = os.environ.get("GMAIL_APP_PASSWORD")
 BLOGGER_MAIL = os.environ.get("BLOGGER_EMAIL")
 MY_GMAIL     = os.environ.get("MY_GMAIL")
 PEXELS_KEY   = os.environ.get("PEXELS_API_KEY")
 
-client       = Groq(api_key=GROQ_KEY)
+# إعداد Gemini
+genai.configure(api_key=GEMINI_KEY)
+model = genai.GenerativeModel('gemini-1.5-flash')
+
 today_date   = datetime.date.today().strftime("%B %d, %Y")
 current_year = 2026
 
@@ -38,20 +40,21 @@ random_modifier = random.choice([
 
 chosen_topic = random.choice(TOPIC_ANGLES)
 
-# ── Prompt ───────────────────────────────────────────────
+# ── Prompt (بقينا على نفس الستيل ديالك) ──────────────────
 prompt = f"""
 Current Date: {today_date}
 Angle: {random_modifier}
 Story: {chosen_topic}
 
-Write an investigative article (Around 800-900 words to avoid rate limits). 
+Write an investigative article (Minimum 1100 words for Google Ads SEO). 
 Structure MUST use tags: [TITLE], [KEYWORDS], [META], [CONTENT].
-Inside [CONTENT], use ONLY HTML: <p>, <h2>, <strong>, <em>.
+Inside [CONTENT], use ONLY HTML tags like <p>, <h2>, <h3>, <strong>, <em>.
+Be very detailed, invent specific names, and use a professional journalist tone.
 """
 
-# ── Robust Parser (FIXED FOR GITHUB ACTIONS) ─────────────
+# ── Robust Parser ────────────────────────────────────────
 def parse_response(raw):
-    # مسح الرموز اللي كتدير مشاكل فـ Python String
+    # تنظيف الماركداون إذا وجد
     clean_raw = raw.replace('**', '').replace('#', '')
     
     title = re.search(r"\[TITLE\]\s*(.*)", clean_raw, re.IGNORECASE)
@@ -66,26 +69,20 @@ def parse_response(raw):
     if content:
         res_content = content.group(1).strip()
     else:
-        # Fallback if parser fails
         res_content = raw.split('[CONTENT]')[-1] if '[CONTENT]' in raw else raw
 
-    # Clean Markdown leftovers
     res_content = re.sub(r'```.*?```', '', res_content, flags=re.DOTALL)
     return res_title[:65], res_kw, res_meta, res_content
 
-# ── Content Generation (WITH RATE LIMIT HANDLING) ────────
+# ── Content Generation (Gemini Edition) ──────────────────
 def generate_content():
     try:
-        # الموديل الأنسب حاليا لتفادي الايرور 429
-        completion = client.chat.completions.create(
-            messages=[{"role": "user", "content": prompt}],
-            model="llama-3.3-70b-versatile", 
-            temperature=0.8,
-            max_tokens=3000, # نقصناه شوية باش مايتبلوكاش الحساب المجاني
-        )
-        return parse_response(completion.choices[0].message.content)
+        response = model.generate_content(prompt)
+        if response.text:
+            return parse_response(response.text)
+        return None, None, None, None
     except Exception as e:
-        print(f"❌ Groq Error: {e}")
+        print(f"❌ Gemini Error: {e}")
         return None, None, None, None
 
 # ── Pexels Image ──────────────────────────────────────────
@@ -101,24 +98,27 @@ def get_best_pexels_image(keywords):
 
 # ── Final Main Function ───────────────────────────────────
 def main():
-    print("🚀 Starting Professional Blogger Bot...")
+    print("🚀 Starting Gemini-Powered Blogger Bot...")
     title, keywords, meta, content = generate_content()
     
-    if title and len(content) > 500:
+    if title and len(content) > 800:
         image_url = get_best_pexels_image(keywords)
         
-        # Build HTML
         full_html = f"""
-        <div dir="ltr" style="font-family: 'Segoe UI', Tahoma, sans-serif; line-height: 1.7; color: #222;">
-            <img src="{image_url}" style="width: 100%; border-radius: 12px; margin-bottom: 20px;" alt="{title}">
-            <div style="text-align: justify;">{content}</div>
-            <p style="margin-top: 50px; border-top: 1px solid #eee; padding-top: 10px; font-size: 12px; color: #777;">
-                Published automatically by Smart Flow Lab Intelligence © {current_year}
+        <div dir="ltr" style="font-family: 'Segoe UI', Tahoma, sans-serif; line-height: 1.8; color: #1a1a1a; max-width: 800px; margin: auto;">
+            <div style="text-align: center; margin-bottom: 30px;">
+                <img src="{image_url}" style="width: 100%; border-radius: 10px; box-shadow: 0 4px 10px rgba(0,0,0,0.1);" alt="{title}">
+            </div>
+            <div style="text-align: justify; font-size: 19px;">
+                {content}
+            </div>
+            <hr style="margin-top: 50px; border: 0; border-top: 1px solid #eee;">
+            <p style="text-align: center; color: #888; font-size: 13px;">
+                © {current_year} Smart Flow Lab Intelligence. All Rights Reserved.
             </p>
         </div>
         """
         
-        # Send Email
         msg = MIMEText(full_html, 'html', 'utf-8')
         msg['Subject'] = title
         msg['From'] = MY_GMAIL
@@ -128,11 +128,11 @@ def main():
             with smtplib.SMTP_SSL('smtp.gmail.com', 465) as server:
                 server.login(MY_GMAIL, GMAIL_PASS)
                 server.send_message(msg)
-            print(f"✅ Published Successfully: {title}")
+            print(f"✅ Published: {title}")
         except Exception as e:
             print(f"❌ Email Error: {e}")
     else:
-        print("❌ Script stopped: Content generation failed or was blocked by Rate Limits.")
+        print("❌ Script stopped: Content too short or Generation failed.")
 
 if __name__ == "__main__":
     main()
