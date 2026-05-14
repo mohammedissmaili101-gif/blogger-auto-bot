@@ -5,6 +5,7 @@ import datetime
 import urllib.parse
 import requests
 import random
+import time
 from email.mime.text import MIMEText
 from groq import Groq
 
@@ -17,26 +18,22 @@ PEXELS_KEY   = os.environ.get("PEXELS_API_KEY")
 
 client       = Groq(api_key=GROQ_KEY)
 today_date   = datetime.date.today().strftime("%B %d, %Y")
-current_year = datetime.date.today().year
+current_year = 2026
 
 # ── Topic Rotation System ─────────────────────────────────
 TOPIC_ANGLES = [
     f"the most disruptive NEW AI model released this week in {current_year}",
-    f"a BREAKTHROUGH scientific study published in {current_year} about cognition",
-    f"a revolutionary AI-powered tool for researchers in {current_year}",
+    f"a BREAKTHROUGH scientific study published in {current_year} about productivity",
+    f"a revolutionary AI-powered tool for students in {current_year}",
     f"a major SILICON VALLEY corporate shakeup happening RIGHT NOW in {current_year}",
-    f"cutting-edge AI application in healthcare or climate tech in {current_year}",
     f"the battle between OpenAI vs Google vs Meta in {current_year}",
-    f"how a new AI coding tool in {current_year} is transforming engineering",
-    f"a viral AI use case regular people are adopting in {current_year}",
 ]
 
 random_modifier = random.choice([
-    "Focus on a hidden scandal or controversy.",
-    "Write it from the perspective of an insider leak.",
-    "Highlight the extreme financial implications.",
-    "Focus on a specific technical term.",
-    "Make the title sound like a high-stakes thriller headline."
+    "Focus on a hidden scandal.",
+    "Write from an insider leak perspective.",
+    "Highlight extreme financial implications.",
+    "Use a high-stakes thriller headline."
 ])
 
 chosen_topic = random.choice(TOPIC_ANGLES)
@@ -47,46 +44,44 @@ Current Date: {today_date}
 Angle: {random_modifier}
 Story: {chosen_topic}
 
-Write an investigative article (Min 1000 words). 
-Structure: [TITLE], [KEYWORDS], [META], [CONTENT] (using only HTML tags like <p>, <h2>, <strong>).
+Write an investigative article (Around 800-900 words to avoid rate limits). 
+Structure MUST use tags: [TITLE], [KEYWORDS], [META], [CONTENT].
+Inside [CONTENT], use ONLY HTML: <p>, <h2>, <strong>, <em>.
 """
 
-# ── Robust Parser (FIXED SYNTAX ERROR) ───────────────────
+# ── Robust Parser (FIXED FOR GITHUB ACTIONS) ─────────────
 def parse_response(raw):
-    # تنظيف بدائي للرموز اللي كدير مشاكل
-    raw_clean = raw.replace('**', '').replace('#', '')
+    # مسح الرموز اللي كتدير مشاكل فـ Python String
+    clean_raw = raw.replace('**', '').replace('#', '')
     
-    title_match = re.search(r"\[TITLE\]\s*(.*)", raw_clean, re.IGNORECASE)
-    kw_match    = re.search(r"\[KEYWORDS\]\s*(.*)", raw_clean, re.IGNORECASE)
-    meta_match  = re.search(r"\[META\]\s*(.*)", raw_clean, re.IGNORECASE)
-    content_match = re.search(r"\[CONTENT\]\s*(.*)", raw, re.DOTALL | re.IGNORECASE)
+    title = re.search(r"\[TITLE\]\s*(.*)", clean_raw, re.IGNORECASE)
+    kw = re.search(r"\[KEYWORDS\]\s*(.*)", clean_raw, re.IGNORECASE)
+    meta = re.search(r"\[META\]\s*(.*)", clean_raw, re.IGNORECASE)
+    content = re.search(r"\[CONTENT\]\s*(.*)", raw, re.DOTALL | re.IGNORECASE)
 
-    title = title_match.group(1).split('[')[0].strip() if title_match else f"Tech Update {today_date}"
-    title = re.sub(r'[^\w\s\-]', '', title)[:65]
+    res_title = title.group(1).split('[')[0].strip() if title else f"Tech Insights {today_date}"
+    res_kw = kw.group(1).split('[')[0].strip() if kw else "tech, innovation"
+    res_meta = meta.group(1).split('[')[0].strip()[:160] if meta else "Exclusive deep-dive."
     
-    keywords = kw_match.group(1).split('[')[0].strip() if kw_match else "tech, ai"
-    meta_desc = meta_match.group(1).split('[')[0].strip()[:160] if meta_match else "Deep dive analysis."
-
-    if content_match:
-        content = content_match.group(1).strip()
+    if content:
+        res_content = content.group(1).strip()
     else:
-        # البحث عن أول وسم HTML إذا فشل الـ Parser
-        html_start = re.search(r"(<p>|<h2>).*", raw, re.DOTALL | re.IGNORECASE)
-        content = html_start.group(0) if html_start else raw
+        # Fallback if parser fails
+        res_content = raw.split('[CONTENT]')[-1] if '[CONTENT]' in raw else raw
 
-    # تنظيف كود الماركداون بـ regex آمن
-    content = re.sub(r'```.*?```', '', content, flags=re.DOTALL)
-    return title, keywords, meta_desc, content
+    # Clean Markdown leftovers
+    res_content = re.sub(r'```.*?```', '', res_content, flags=re.DOTALL)
+    return res_title[:65], res_kw, res_meta, res_content
 
-# ── Content Generation ────────────────────────────────────
+# ── Content Generation (WITH RATE LIMIT HANDLING) ────────
 def generate_content():
     try:
+        # الموديل الأنسب حاليا لتفادي الايرور 429
         completion = client.chat.completions.create(
             messages=[{"role": "user", "content": prompt}],
-            # الموديل المحدث والمتاح حالياً
             model="llama-3.3-70b-versatile", 
             temperature=0.8,
-            max_tokens=3500,
+            max_tokens=3000, # نقصناه شوية باش مايتبلوكاش الحساب المجاني
         )
         return parse_response(completion.choices[0].message.content)
     except Exception as e:
@@ -99,47 +94,45 @@ def get_best_pexels_image(keywords):
     headers = {"Authorization": PEXELS_KEY}
     try:
         url = f"https://api.pexels.com/v1/search?query={urllib.parse.quote(keywords)}&per_page=1"
-        res = requests.get(url, headers=headers, timeout=10).json()
+        res = requests.get(url, headers=headers, timeout=15).json()
         return res["photos"][0]["src"]["large2x"] if res.get("photos") else "https://picsum.photos/1200/630"
     except:
         return "https://picsum.photos/1200/630"
 
-# ── HTML & Email ──────────────────────────────────────────
-def build_html(title, image_url, article_body):
-    return f"""
-    <div dir="ltr" style="font-family: Georgia, serif; line-height: 1.8; font-size: 19px; max-width: 800px; margin: auto; padding: 20px; color: #333;">
-        <img src="{image_url}" style="width: 100%; border-radius: 8px; margin-bottom: 25px;" alt="{title}">
-        <div class="content">{article_body}</div>
-        <p style="margin-top: 40px; border-top: 1px solid #eee; padding-top: 10px; color: #999; font-size: 14px;">
-            Published via Smart Flow Lab | {today_date}
-        </p>
-    </div>
-    """
-
-def send_email(title, html_body):
-    msg = MIMEText(html_body, 'html', 'utf-8')
-    msg['Subject'] = title.strip()
-    msg['From'] = MY_GMAIL
-    msg['To'] = BLOGGER_MAIL
-    try:
-        with smtplib.SMTP_SSL('smtp.gmail.com', 465, timeout=60) as server:
-            server.login(MY_GMAIL, GMAIL_PASS)
-            server.send_message(msg)
-        print(f"✅ Published: {title}")
-    except Exception as e:
-        print(f"❌ SMTP Error: {e}")
-
+# ── Final Main Function ───────────────────────────────────
 def main():
-    print("🚀 Bot starting...")
+    print("🚀 Starting Professional Blogger Bot...")
     title, keywords, meta, content = generate_content()
     
-    # التأكد من أن المقال طويل كفاية (لـ Google Ads)
-    if title and len(content) > 600:
-        img = get_best_pexels_image(keywords)
-        html = build_html(title, img, content)
-        send_email(title, html)
+    if title and len(content) > 500:
+        image_url = get_best_pexels_image(keywords)
+        
+        # Build HTML
+        full_html = f"""
+        <div dir="ltr" style="font-family: 'Segoe UI', Tahoma, sans-serif; line-height: 1.7; color: #222;">
+            <img src="{image_url}" style="width: 100%; border-radius: 12px; margin-bottom: 20px;" alt="{title}">
+            <div style="text-align: justify;">{content}</div>
+            <p style="margin-top: 50px; border-top: 1px solid #eee; padding-top: 10px; font-size: 12px; color: #777;">
+                Published automatically by Smart Flow Lab Intelligence © {current_year}
+            </p>
+        </div>
+        """
+        
+        # Send Email
+        msg = MIMEText(full_html, 'html', 'utf-8')
+        msg['Subject'] = title
+        msg['From'] = MY_GMAIL
+        msg['To'] = BLOGGER_MAIL
+        
+        try:
+            with smtplib.SMTP_SSL('smtp.gmail.com', 465) as server:
+                server.login(MY_GMAIL, GMAIL_PASS)
+                server.send_message(msg)
+            print(f"✅ Published Successfully: {title}")
+        except Exception as e:
+            print(f"❌ Email Error: {e}")
     else:
-        print("❌ Generation failed or too short.")
+        print("❌ Script stopped: Content generation failed or was blocked by Rate Limits.")
 
 if __name__ == "__main__":
     main()
