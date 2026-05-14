@@ -34,90 +34,84 @@ TOPIC_ANGLES = [
 
 chosen_topic = random.choice(TOPIC_ANGLES)
 
-# برومبت أقوى لضمان عدم خروج البوت عن النص
 prompt = f"""
 Current Date: {today_date}
-Role: Expert Tech Journalist for Smart Flow Lab.
-Task: Write a high-quality article for Google News about: {chosen_topic}
+Role: Senior Tech Journalist for Smart Flow Lab.
+Task: Write a deep-dive technical article (1000+ words) about: {chosen_topic}
 
-Format your response EXACTLY as follows (Don't include any conversational text):
-[TITLE] (Catchy professional headline)
-[KEYWORDS] (3 relevant keywords for image search)
-[META] (SEO description)
+Required Structure (STRICT):
+[TITLE] Headline
+[KEYWORDS] search terms
+[META] short description
 [CONTENT]
-(HTML body: Use <h2>, <p>, <strong>, <blockquote>. Min 1000 words.)
+Full HTML body with <h2>, <p>, <strong>. No markdown blocks.
 """
 
 def parse_response(raw):
+    """نظام تحليل مرن جداً لتجنب الفشل"""
     try:
-        # استخراج العناوين بمرونة عالية جداً
-        title_search = re.search(r"\[TITLE\]\s*(.*)", raw, re.IGNORECASE)
-        kw_search = re.search(r"\[KEYWORDS\]\s*(.*)", raw, re.IGNORECASE)
-        meta_search = re.search(r"\[META\]\s*(.*)", raw, re.IGNORECASE)
+        # استخراج الأجزاء مع مراعاة وجود Markdown (مثل **[TITLE]**)
+        title = re.search(r"TITLE\]?[:\s]*(.*)", raw, re.IGNORECASE)
+        keywords = re.search(r"KEYWORDS\]?[:\s]*(.*)", raw, re.IGNORECASE)
+        meta = re.search(r"META\]?[:\s]*(.*)", raw, re.IGNORECASE)
         
-        content_parts = re.split(r"\[CONTENT\]", raw, flags=re.IGNORECASE)
-        content = content_parts[-1].strip() if len(content_parts) > 1 else ""
+        # تقسيم المحتوى بذكاء
+        content_split = re.split(r"CONTENT\]?", raw, flags=re.IGNORECASE)
+        content = content_split[-1].strip() if len(content_split) > 1 else raw
 
-        # تنظيف العناوين من أي رموز ماركداون
-        title = title_search.group(1).strip() if title_search else chosen_topic
-        title = re.sub(r'[#*]', '', title) 
-
-        keywords = kw_search.group(1).strip() if kw_search else "tech productivity"
-        meta_desc = meta_search.group(1).strip() if meta_search else "Professional productivity analysis."
+        # تنظيف العناوين
+        clean_title = re.sub(r'[#*\[\]]', '', title.group(1)).strip() if title else chosen_topic
+        clean_kw = re.sub(r'[#*\[\]]', '', keywords.group(1)).strip() if keywords else "productivity AI"
+        clean_meta = meta.group(1).strip() if meta else "Smart Flow Lab Deep Dive."
         
-        content = re.sub(r'```html|```', '', content).strip()
+        # إزالة أي أكواد ماركداون (```html) قد يضيفها البوت
+        content = re.sub(r'```[a-z]*', '', content).replace('```', '').strip()
         
-        return title, keywords, meta_desc, content
-    except:
-        return chosen_topic, "productivity", "Expert analysis", ""
+        return clean_title, clean_kw, clean_meta, content
+    except Exception as e:
+        print(f"⚠️ Parsing recovery mode: {e}")
+        return chosen_topic, "productivity", "AI tech update", raw
 
 def get_best_pexels_image(keywords):
-    # تم تصحيح الروابط هنا (حذف الأقواس المربعة)
-    fallback_img = f"https://picsum.photos/seed/{random.randint(1,999)}/1200/630"
-    if not PEXELS_KEY: return fallback_img
+    fallback = f"[https://picsum.photos/seed/](https://picsum.photos/seed/){random.randint(1,999)}/1200/630"
+    if not PEXELS_KEY: return fallback
     try:
         query = urllib.parse.quote(keywords)
-        url = f"https://api.pexels.com/v1/search?query={query}&per_page=1"
-        res = requests.get(url, headers={"Authorization": PEXELS_KEY}, timeout=10)
-        photos = res.json().get("photos", [])
-        return photos[0]["src"]["large2x"] if photos else fallback_img
+        res = requests.get(f"[https://api.pexels.com/v1/search?query=](https://api.pexels.com/v1/search?query=){query}&per_page=1", 
+                          headers={"Authorization": PEXELS_KEY}, timeout=10)
+        data = res.json()
+        return data["photos"][0]["src"]["large2x"] if data.get("photos") else fallback
     except:
-        return fallback_img
+        return fallback
 
 def build_html(title, meta_desc, image_url, article_body):
-    # تصميم متوافق مع Google News (نظيف واحترافي)
     return f"""<!DOCTYPE html>
 <html lang="en">
 <head>
 <meta charset="UTF-8">
-<title>{title}</title>
 <style>
-  body {{ font-family: 'Helvetica Neue', Arial, sans-serif; line-height: 1.6; color: #333; max-width: 800px; margin: auto; padding: 20px; background: #fff; }}
-  .header {{ border-bottom: 2px solid #eee; margin-bottom: 30px; padding-bottom: 20px; }}
-  h1 {{ font-size: 2.5rem; color: #111; margin-bottom: 10px; }}
-  .meta-top {{ color: #666; font-size: 0.9rem; margin-bottom: 20px; }}
-  .main-img {{ width: 100%; height: auto; border-radius: 8px; margin-bottom: 30px; box-shadow: 0 4px 10px rgba(0,0,0,0.1); }}
-  h2 {{ color: #2c3e50; margin-top: 40px; border-left: 5px solid #3498db; padding-left: 15px; }}
-  p {{ margin-bottom: 20px; font-size: 1.1rem; }}
-  blockquote {{ background: #f9f9f9; border-left: 10px solid #ccc; margin: 1.5em 10px; padding: 0.5em 10px; font-style: italic; }}
-  .footer {{ margin-top: 50px; padding-top: 20px; border-top: 1px solid #eee; font-size: 0.8rem; color: #999; text-align: center; }}
+  body {{ font-family: 'Helvetica Neue', Helvetica, Arial, sans-serif; line-height: 1.8; color: #1a1a1a; max-width: 850px; margin: auto; padding: 30px; background: #fefefe; }}
+  .header {{ text-align: center; border-bottom: 3px solid #3498db; margin-bottom: 40px; padding-bottom: 20px; }}
+  h1 {{ font-size: 42px; margin-bottom: 10px; color: #2c3e50; line-height: 1.2; }}
+  .meta-info {{ color: #7f8c8d; font-style: italic; margin-bottom: 20px; }}
+  .hero-img {{ width: 100%; border-radius: 12px; margin-bottom: 35px; box-shadow: 0 10px 20px rgba(0,0,0,0.1); }}
+  h2 {{ color: #2980b9; margin-top: 45px; font-size: 28px; border-left: 6px solid #3498db; padding-left: 15px; }}
+  p {{ margin-bottom: 25px; font-size: 19px; }}
+  blockquote {{ background: #f8f9fa; border-left: 8px solid #bdc3c7; padding: 20px; margin: 30px 0; font-style: italic; font-size: 21px; }}
+  .footer {{ margin-top: 60px; padding: 30px; background: #2c3e50; color: white; border-radius: 8px; text-align: center; }}
 </style>
 </head>
 <body>
   <div class="header">
     <h1>{title}</h1>
-    <div class="meta-top">Published by <strong>Smart Flow Editorial</strong> • {today_date} • 5 min read</div>
+    <div class="meta-info">By Smart Flow Editorial Team • Updated {today_date}</div>
   </div>
-  
-  <img src="{image_url}" class="main-img" alt="{title}">
-  
-  <div class="article-content">
+  <img src="{image_url}" class="hero-img" alt="Productivity Trends">
+  <div class="main-content">
     {article_body}
   </div>
-
   <div class="footer">
-    © {current_year} Smart Flow Lab. All rights reserved. <br>
-    Indexed for Productivity Intelligence.
+    © {current_year} Smart Flow Lab. Empowering workflows through AI.
   </div>
 </body>
 </html>"""
@@ -132,22 +126,28 @@ def send_email(title, html_body):
         server.send_message(msg)
 
 if __name__ == "__main__":
-    print("🚀 Running Google News Optimized Automation...")
-    t, k, m, body = None, None, None, None
-    
-    for _ in range(3): # محاولة التوليد حتى ينجح
-        t, k, m, body = parse_response(client.chat.completions.create(
+    print("🚀 Smart Flow Automation Started...")
+    try:
+        # محاولة التوليد
+        response = client.chat.completions.create(
             messages=[{"role": "user", "content": prompt}],
             model="llama-3.3-70b-versatile",
-            temperature=0.6,
+            temperature=0.7,
             max_tokens=4000
-        ).choices[0].message.content)
-        if len(body) > 500: break
+        )
+        raw_text = response.choices[0].message.content
+        
+        # التحليل
+        t, k, m, body = parse_response(raw_text)
+        
+        # التأكد من وجود محتوى حتى لو فشل الـ parser
+        if len(body) < 100:
+            raise ValueError("Content too short, AI lazy response.")
 
-    if t and body:
-        img_link = get_best_pexels_image(k)
-        full_html = build_html(t, m, img_link, body)
-        send_email(t, full_html)
+        img = get_best_pexels_image(k)
+        html = build_html(t, m, img, body)
+        send_email(t, html)
         print(f"✅ Success! Published: {t}")
-    else:
-        print("❌ Failed to generate quality content.")
+        
+    except Exception as e:
+        print(f"❌ Final Critical Error: {e}")
