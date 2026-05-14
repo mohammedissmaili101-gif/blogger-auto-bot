@@ -19,7 +19,7 @@ client       = Groq(api_key=GROQ_KEY)
 today_date   = datetime.date.today().strftime("%B %d, %Y")
 current_year = datetime.date.today().year
 
-# ── Topic Rotation System (تم توسيعها لضمان التنوع اللانهائي) ─────────────────
+# ── Topic Rotation System ─────────────────────────────────
 TOPIC_ANGLES = [
     f"the most disruptive NEW AI model released this week in {current_year} — cover its benchmarks, real-world impact, and what it means for the industry",
     f"a BREAKTHROUGH scientific study published in {current_year} that is reshaping how we understand human cognition, learning, or productivity using technology",
@@ -31,7 +31,6 @@ TOPIC_ANGLES = [
     f"a viral, trend-setting AI use case that regular people are adopting RIGHT NOW in {current_year} — explain the why, the how, and the societal impact",
 ]
 
-# إضافة لمسة عشوائية لضمان عنوان مختلف كل مرة
 random_modifier = random.choice([
     "Focus on a hidden scandal or controversy.",
     "Write it from the perspective of an insider leak.",
@@ -79,13 +78,11 @@ your full HTML article here using ONLY <p>, <h2>, <h3>, <strong>, <em>, <blockqu
 
 # ── Robust Parser ────────────────────────────────────────
 def parse_response(raw):
-    # Normalize tag casing and spacing
     normalized = re.sub(
         r'\[\s*(TITLE|KEYWORDS|META|CONTENT)\s*\]',
         lambda m: f'[{m.group(1).upper()}]',
         raw, flags=re.IGNORECASE
     )
-
     normalized = re.sub(r'\[CONTENT[:\s]*\]', '[CONTENT]', normalized, flags=re.IGNORECASE)
 
     title_match   = re.search(r"\[TITLE\](.*?)(?=\[KEYWORDS\]|\[META\]|\[CONTENT\]|$)", normalized, re.DOTALL)
@@ -103,17 +100,13 @@ def parse_response(raw):
     keywords = kw_match.group(1).strip()     if kw_match   else "tech, innovation, ai"
     meta_raw = meta_match.group(1).strip()   if meta_match else f"Exclusive analysis for {current_year}."
 
-    # التنظيف وتصحيح Regex (حل مشكلة Syntax Error)
     title = re.sub(r'[#*`]', '', title).strip()
     title = re.sub(r'^[\s\-:]+|[\s\-:]+$', '', title).strip()
-
     meta_desc = meta_raw[:160].strip()
 
     content = content_raw.strip()
     content = re.sub(r'```[\w]*|```', '', content)
     content = re.sub(r'##\s+(.*?)(\n|$)', r'<h2>\1</h2>', content)
-    
-    # تصحيح علامات النجمة لعدم الوقوع في خطأ الـ Literal String
     content = re.sub(r'\*\*(.*?)\*\*', r'<strong>\1</strong>', content)
     content = re.sub(r'\*(.*?)\*', r'<em>\1</em>', content)
     content = content.strip()
@@ -121,7 +114,7 @@ def parse_response(raw):
     return title, keywords, meta_desc, content
 
 
-# ── Content Generation (with retry) ──────────────────────
+# ── Content Generation ────────────────────────────────────
 def generate_content(max_retries=3):
     for attempt in range(1, max_retries + 1):
         print(f"🤖 AI attempt {attempt}/{max_retries}...")
@@ -129,22 +122,19 @@ def generate_content(max_retries=3):
             completion = client.chat.completions.create(
                 messages=[{"role": "user", "content": prompt}],
                 model="llama-3.3-70b-versatile",
-                temperature=0.90, # رفع الحرارة قليلاً لزيادة الإبداع في العناوين
+                temperature=0.90,
                 max_tokens=4096,
             )
             raw = completion.choices[0].message.content
-
             result = parse_response(raw)
             if result[0] and len(result[3]) > 100:
                 return result
-
         except Exception as e:
             print(f"❌ API error on attempt {attempt}: {e}")
-
     return None, None, None, None
 
 
-# ── Pexels Image (bright, relevant) ──────────────────────
+# ── Pexels Image ──────────────────────────────────────────
 def get_best_pexels_image(keywords):
     fallback_keywords = [keywords, "modern technology", "future intelligence"]
     if not PEXELS_KEY:
@@ -168,7 +158,6 @@ def get_best_pexels_image(keywords):
 def build_html(title, meta_desc, image_url, article_body):
     title_safe = title.replace('"', '&quot;')
     meta_safe  = meta_desc.replace('"', '&quot;')
-
     return f"""<!DOCTYPE html>
 <html lang="en">
 <head>
@@ -200,19 +189,24 @@ def build_html(title, meta_desc, image_url, article_body):
 </html>
 """
 
-# ── Send Email ────────────────────────────────────────────
+# ── Send Email (التعديل هنا لضمان النشر) ──────────────────────
 def send_email(title, html_body):
+    # تنظيف العنوان من أي سطور مخفية قد تمنع بلوجر من القراءة
+    clean_title = title.strip().replace("\n", "").replace("\r", "")
+    
     msg            = MIMEText(html_body, 'html', 'utf-8')
-    msg['Subject'] = title
-    msg['From']    = MY_GMAIL
+    msg['Subject'] = clean_title
+    msg['From']    = f"Smart Publisher <{MY_GMAIL}>" # إضافة اسم للمرسل لزيادة المصداقية
     msg['To']      = BLOGGER_MAIL
+
     try:
-        with smtplib.SMTP_SSL('smtp.gmail.com', 465) as server:
+        # إضافة timeout بـ 30 ثانية لضمان عدم انقطاع الاتصال
+        with smtplib.SMTP_SSL('smtp.gmail.com', 465, timeout=30) as server:
             server.login(MY_GMAIL, GMAIL_PASS)
             server.send_message(msg)
-        print(f"✅ Published: {title}")
+        print(f"✅ Published & Sent: {clean_title}")
     except Exception as e:
-        print(f"❌ Error: {e}")
+        print(f"❌ SMTP/Blogger Error: {e}")
 
 # ── Main ──────────────────────────────────────────────────
 def main():
