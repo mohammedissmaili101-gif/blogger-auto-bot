@@ -15,10 +15,6 @@ BLOGGER_MAIL = os.environ.get("BLOGGER_EMAIL")
 MY_GMAIL     = os.environ.get("MY_GMAIL")
 PEXELS_KEY   = os.environ.get("PEXELS_API_KEY")
 
-# ✅ تبديل Llama 3 بـ Mistral (مفتوح بلا قيود)
-API_URL = "https://api-inference.huggingface.co/models/mistralai/Mistral-7B-Instruct-v0.3"
-headers = {"Authorization": f"Bearer {HF_TOKEN}"}
-
 today_date   = datetime.date.today().strftime("%B %d, %Y")
 current_year = 2026
 
@@ -38,22 +34,90 @@ random_modifier = random.choice([
 
 chosen_topic = random.choice(TOPIC_ANGLES)
 
-# ✅ prompt format ديال Mistral
-prompt = f"<s>[INST] Current Date: {today_date}\nAngle: {random_modifier}\nStory: {chosen_topic}\n\nWrite an investigative article (Min 1000 words).\nStructure: [TITLE], [KEYWORDS], [META], [CONTENT] (using only HTML tags like <p>, <h2>, <strong>).\nFocus on technical depth and exclusive leaks. [/INST]"
+# ── HF Inference Client (API الجديد) ─────────────────────
+def call_hf_api(user_prompt):
+    # ✅ API الجديد ديال HF - يشتغل مع كل الموديلات
+    API_URL = "https://api-inference.huggingface.co/v1/chat/completions"
+
+    headers = {
+        "Authorization": f"Bearer {HF_TOKEN}",
+        "Content-Type": "application/json"
+    }
+
+    payload = {
+        "model": "mistralai/Mistral-7B-Instruct-v0.3",
+        "messages": [
+            {
+                "role": "user",
+                "content": user_prompt
+            }
+        ],
+        "max_tokens": 2500,
+        "temperature": 0.7,
+        "top_p": 0.9,
+        "stream": False
+    }
+
+    for attempt in range(1, 4):
+        try:
+            print(f"🤖 Attempt {attempt}/3...")
+            response = requests.post(API_URL, headers=headers, json=payload, timeout=120)
+
+            if response.status_code == 200:
+                result = response.json()
+                return result["choices"][0]["message"]["content"]
+
+            elif response.status_code == 503:
+                print("⏳ Model loading, waiting 30s...")
+                time.sleep(30)
+                continue
+
+            else:
+                print(f"❌ HF Error {response.status_code}: {response.text[:200]}")
+                return None
+
+        except Exception as e:
+            print(f"❌ Request Error: {e}")
+            time.sleep(10)
+
+    return None
+
+# ── Prompt ────────────────────────────────────────────────
+def build_prompt():
+    return f"""Current Date: {today_date}
+Angle: {random_modifier}
+Story: {chosen_topic}
+
+You are an investigative tech journalist. Write a detailed article (minimum 1000 words).
+
+IMPORTANT - Start your response with exactly this structure:
+[TITLE] your title here (under 65 chars, specific and punchy)
+[KEYWORDS] keyword1, keyword2, keyword3
+[META] your meta description here (under 160 chars)
+[CONTENT]
+your full article here using only HTML tags: <p>, <h2>, <h3>, <strong>, <em>, <blockquote>
+
+Rules:
+- No markdown, no asterisks, no hashtags
+- Minimum 1000 words in the article body
+- Make the title unique and specific to this story
+- Focus on technical depth and exclusive analysis"""
 
 # ── Robust Parser ─────────────────────────────────────────
 def parse_response(raw):
-    raw_clean = re.sub(r'<\|.*?\|>', '', raw)
-    raw_clean = re.sub(r'[*#]', '', raw_clean)
+    if not raw:
+        return None, None, None, None
+
+    raw_clean = re.sub(r'[*#]', '', raw)
 
     title_match   = re.search(r"\[TITLE\]\s*(.*)",   raw_clean, re.IGNORECASE)
     kw_match      = re.search(r"\[KEYWORDS\]\s*(.*)", raw_clean, re.IGNORECASE)
     meta_match    = re.search(r"\[META\]\s*(.*)",     raw_clean, re.IGNORECASE)
     content_match = re.search(r"\[CONTENT\]\s*(.*)",  raw_clean, re.DOTALL | re.IGNORECASE)
 
-    title     = title_match.group(1).split('[')[0].strip()   if title_match   else f"Tech Update {today_date}"
-    keywords  = kw_match.group(1).split('[')[0].strip()      if kw_match      else "tech, ai"
-    meta_desc = meta_match.group(1).split('[')[0].strip()[:160] if meta_match else "Deep dive analysis."
+    title     = title_match.group(1).split('[')[0].strip()        if title_match   else f"Tech Exclusive {today_date}"
+    keywords  = kw_match.group(1).split('[')[0].strip()           if kw_match      else "tech, ai, innovation"
+    meta_desc = meta_match.group(1).split('[')[0].strip()[:160]   if meta_match    else "Deep dive analysis."
 
     if content_match:
         content = content_match.group(1).strip()
@@ -63,35 +127,16 @@ def parse_response(raw):
 
     return title[:65], keywords, meta_desc, content
 
-# ── Content Generation (Hugging Face) ─────────────────────
+# ── Content Generation ────────────────────────────────────
 def generate_content():
-    try:
-        payload = {
-            "inputs": prompt,
-            "parameters": {
-                "max_new_tokens": 2500,
-                "temperature": 0.7,
-                "top_p": 0.9,
-                "return_full_text": False
-            }
-        }
+    prompt = build_prompt()
+    raw = call_hf_api(prompt)
 
-        response = requests.post(API_URL, headers=headers, json=payload, timeout=120)
-
-        if response.status_code == 200:
-            result = response.json()
-            raw_text = result[0]['generated_text'] if isinstance(result, list) else result['generated_text']
-            return parse_response(raw_text)
-        elif response.status_code == 503:
-            print("⏳ Model is loading on Hugging Face, waiting 20s...")
-            time.sleep(20)
-            return generate_content()
-        else:
-            print(f"❌ HF Error: {response.status_code} - {response.text}")
-            return None, None, None, None
-    except Exception as e:
-        print(f"❌ Generation Error: {e}")
+    if not raw:
+        print("❌ No response from HF API.")
         return None, None, None, None
+
+    return parse_response(raw)
 
 # ── Pexels Image ──────────────────────────────────────────
 def get_best_pexels_image(keywords):
@@ -107,16 +152,22 @@ def get_best_pexels_image(keywords):
 # ── Main ──────────────────────────────────────────────────
 def main():
     print("🚀 Starting HF-Powered Bot...")
+    print(f"📌 Topic: {chosen_topic[:80]}")
+    print(f"🎯 Angle: {random_modifier}")
+
     title, keywords, meta, content = generate_content()
 
     if title and content and len(content) > 600:
+        print(f"📰 Title: {title}")
         img = get_best_pexels_image(keywords)
+
         html = f"""
         <div dir="ltr" style="font-family: Arial; line-height: 1.8; font-size: 18px; color: #333;">
             <img src="{img}" style="width: 100%; border-radius: 8px;" alt="{title}">
             <div style="margin-top: 20px;">{content}</div>
         </div>
         """
+
         msg = MIMEText(html, 'html', 'utf-8')
         msg['Subject'] = title
         msg['From']    = MY_GMAIL
