@@ -29,4 +29,6 @@ jobs:
           BLOGGER_EMAIL: ${{ secrets.BLOGGER_EMAIL }}
           MY_GMAIL: ${{ secrets.MY_GMAIL }}
           PEXELS_API_KEY: ${{ secrets.PEXELS_API_KEY }}
+          SENDER_GMAIL: ${{ secrets.SENDER_GMAIL }}
+          SENDER_GMAIL_PASS: ${{ secrets.SENDER_GMAIL_PASS }}
         run: python main.py
