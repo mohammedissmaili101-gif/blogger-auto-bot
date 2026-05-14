@@ -31,19 +31,27 @@ Ensure the tone is human, analytical, and exclusive. No AI-cliches.]
 
 def generate_content():
     try:
+        # هنا تم تحديث الموديل لنسخة Llama 3.3 لضمان استمرار العمل
         completion = client.chat.completions.create(
             messages=[{"role": "user", "content": prompt}],
-            model="llama3-70b-8192", 
+            model="llama-3.3-70b-versatile", 
             temperature=0.6, 
         )
         raw_text = completion.choices[0].message.content
         
         # تقسيم الاستجابة بدقة
-        title = re.search(r"TITLE:(.*)", raw_text).group(1).strip()
-        keywords = re.search(r"KEYWORDS:(.*)", raw_text).group(1).strip().replace(" ", "")
-        content = raw_text.split("CONTENT:")[1].strip()
+        title_match = re.search(r"TITLE:(.*)", raw_text)
+        keywords_match = re.search(r"KEYWORDS:(.*)", raw_text)
         
-        return title, keywords, content
+        if title_match and keywords_match and "CONTENT:" in raw_text:
+            title = title_match.group(1).strip()
+            keywords = keywords_match.group(1).strip().replace(" ", "")
+            content = raw_text.split("CONTENT:")[1].strip()
+            return title, keywords, content
+        else:
+            print("Error: AI response format is incorrect.")
+            return None, None, None
+            
     except Exception as e:
         print(f"Error generating content: {e}")
         return None, None, None
