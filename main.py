@@ -78,40 +78,30 @@ your full HTML article here using ONLY <p>, <h2>, <h3>, <strong>, <em>, <blockqu
 
 # ── Robust Parser ────────────────────────────────────────
 def parse_response(raw):
-    # تنظيف النص من أي علامات Markdown قد تعيق البحث عن العناوين
     raw_clean = raw.replace('**', '').replace('#', '')
-
-    # محاولة البحث عن الأقسام
     title_match = re.search(r"\[TITLE\]\s*(.*)", raw_clean, re.IGNORECASE)
     kw_match    = re.search(r"\[KEYWORDS\]\s*(.*)", raw_clean, re.IGNORECASE)
     meta_match  = re.search(r"\[META\]\s*(.*)", raw_clean, re.IGNORECASE)
     content_match = re.search(r"\[CONTENT\]\s*(.*)", raw, re.DOTALL | re.IGNORECASE)
 
-    # 1. استخراج العنوان
     title = ""
     if title_match:
         title = title_match.group(1).split('[')[0].strip()
     
-    # Plan B للعنوان: إذا فشل البحث، نأخذ أول سطر مفيد
     if not title or len(title) < 5:
         lines = [l.strip() for l in raw_clean.split('\n') if len(l.strip()) > 10 and not l.startswith('[')]
         title = lines[0] if lines else f"Tech Insights {current_year}"
 
-    # تنظيف نهائي للعنوان
     title = re.sub(r'[^\w\s\-\!\?]', '', title)[:65].strip()
-
-    # 2. استخراج الكلمات المفتاحية والميتا
     keywords = kw_match.group(1).split('[')[0].strip() if kw_match else "tech, innovation, ai"
     meta_desc = meta_match.group(1).split('[')[0].strip()[:160] if meta_match else f"Exclusive analysis for {current_year}."
 
-    # 3. استخراج المحتوى
     if content_match:
         content = content_match.group(1).strip()
     else:
         html_start = re.search(r"(<p>|<h2>).*", raw, re.DOTALL | re.IGNORECASE)
         content = html_start.group(0) if html_start else raw
 
-    # 4. تنظيف المحتوى (الاحتفاظ بالتنظيف الأصلي لضمان عدم تخريب HTML)
     content = re.sub(r'```[\w]*|```', '', content)
     content = re.sub(r'##\s+(.*?)(\n|$)', r'<h2>\1</h2>', content)
     content = re.sub(r'\*\*(.*?)\*\*', r'<strong>\1</strong>', content)
@@ -161,59 +151,40 @@ def get_best_pexels_image(keywords):
     return f"https://picsum.photos/seed/{random.randint(1,9999)}/1200/628"
 
 
-# ── Magazine-Quality HTML Builder ────────────────────────
+# ── Magazine-Quality HTML Builder (Optimized for Blogger) ─────────────
 def build_html(title, meta_desc, image_url, article_body):
-    title_safe = title.replace('"', '&quot;')
-    meta_safe  = meta_desc.replace('"', '&quot;')
-    return f"""<!DOCTYPE html>
-<html lang="en">
-<head>
-<meta charset="UTF-8">
-<meta name="viewport" content="width=device-width, initial-scale=1.0">
-<meta name="description" content="{meta_safe}">
-<link href="https://fonts.googleapis.com/css2?family=Playfair+Display:wght@700;800&family=Source+Serif+4:ital,wght@0,400;0,600;1,400&family=DM+Sans:wght@400;500&display=swap" rel="stylesheet">
-<style>
-  *, *::before, *::after {{ box-sizing: border-box; margin: 0; padding: 0; }}
-  :root {{ --ink: #0d0d0d; --accent: #c0392b; --bg: #fafaf8; }}
-  body {{ font-family: 'Source Serif 4', Georgia, serif; background: var(--bg); color: var(--ink); font-size: 19px; line-height: 1.75; }}
-  .top-bar {{ background: var(--ink); color: #fff; text-align: center; padding: 10px; font-family: 'DM Sans', sans-serif; font-size: 11px; letter-spacing: 0.18em; text-transform: uppercase; }}
-  .article-wrap {{ max-width: 740px; margin: 0 auto; padding: 40px 24px 80px; }}
-  h1.headline {{ font-family: 'Playfair Display', serif; font-size: 42px; font-weight: 800; line-height: 1.15; margin-bottom: 20px; }}
-  .featured-image-wrap img {{ width: 100%; border-radius: 4px; margin-bottom: 20px; }}
-  .content p {{ margin-bottom: 26px; }}
-  .content h2 {{ font-family: 'Playfair Display', serif; font-size: 28px; margin: 40px 0 20px; border-bottom: 1px solid #ddd; }}
-  blockquote {{ border-left: 4px solid var(--accent); background: #fff8f7; margin: 30px 0; padding: 20px; font-style: italic; }}
-</style>
-</head>
-<body>
-<div class="top-bar">Smart Flow Lab | {today_date}</div>
-<article class="article-wrap">
-  <h1 class="headline">{title}</h1>
-  <div class="featured-image-wrap"><img src="{image_url}"></div>
-  <div class="content">{article_body}</div>
-</article>
-</body>
-</html>
-"""
+    # إزالة علامات HTML الكاملة (html, head, body) لأن بلوجر يحتاج فقط للمحتوى
+    return f"""
+    <div style="font-family: 'Georgia', serif; color: #1a1a1a; line-height: 1.8; font-size: 18px; max-width: 700px; margin: auto;">
+        <div style="margin-bottom: 25px;">
+            <img src="{image_url}" alt="{title}" style="width: 100%; height: auto; border-radius: 8px; box-shadow: 0 4px 12px rgba(0,0,0,0.1);" />
+        </div>
+        <div class="main-article-body">
+            {article_body}
+        </div>
+        <div style="margin-top: 50px; padding-top: 20px; border-top: 1px solid #eee; text-align: center; color: #888; font-family: sans-serif; font-size: 13px;">
+            Published via Smart Flow Lab &copy; {current_year} | {today_date}
+        </div>
+    </div>
+    """
 
-# ── Send Email (التعديل هنا لضمان النشر) ──────────────────────
+# ── Send Email (Final Fix for Blogger Recognition) ──────────────
 def send_email(title, html_body):
-    # تنظيف العنوان من أي سطور مخفية قد تمنع بلوجر من القراءة
     clean_title = title.strip().replace("\n", "").replace("\r", "")
     
     msg            = MIMEText(html_body, 'html', 'utf-8')
     msg['Subject'] = clean_title
-    msg['From']    = f"Smart Publisher <{MY_GMAIL}>" # إضافة اسم للمرسل لزيادة المصداقية
+    # يجب أن يكون الـ From مطابقاً تماماً لإيميلك المسجل في بلوجر لضمان المصداقية
+    msg['From']    = MY_GMAIL 
     msg['To']      = BLOGGER_MAIL
 
     try:
-        # إضافة timeout بـ 30 ثانية لضمان عدم انقطاع الاتصال
         with smtplib.SMTP_SSL('smtp.gmail.com', 465, timeout=30) as server:
             server.login(MY_GMAIL, GMAIL_PASS)
             server.send_message(msg)
-        print(f"✅ Published & Sent: {clean_title}")
+        print(f"✅ Success: Article '{clean_title}' sent to Blogger.")
     except Exception as e:
-        print(f"❌ SMTP/Blogger Error: {e}")
+        print(f"❌ SMTP Error: {e}")
 
 # ── Main ──────────────────────────────────────────────────
 def main():
