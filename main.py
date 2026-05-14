@@ -20,7 +20,6 @@ today_date   = datetime.date.today().strftime("%B %d, %Y")
 current_year = datetime.date.today().year
 
 # ── Topic Rotation System ─────────────────────────────────
-# كل مرة يختار موضوع مختلف عشوائياً لضمان التنوع
 TOPIC_ANGLES = [
     f"the most disruptive NEW AI model released this week in {current_year} — cover its benchmarks, real-world impact, and what it means for the industry",
     f"a BREAKTHROUGH scientific study published in {current_year} that is reshaping how we understand human cognition, learning, or productivity using technology",
@@ -60,65 +59,112 @@ STRUCTURE REQUIRED (use these exact HTML tags):
 - Use <em> for emphasis on critical insights
 - End with a forward-looking <h2> conclusion section
 
-YOU MUST FORMAT YOUR EXACT RESPONSE USING THESE TAGS (no extra text outside them):
-[TITLE] One clean journalistic title, max 65 chars, NO special symbols.
-[KEYWORDS] 4 vivid English words for a photojournalism-quality cover image (e.g., "scientist laboratory neural network", "developer laptop glowing code"). Must be BRIGHT, COLORFUL, and RELEVANT — avoid dark/abstract scenes.
-[META] A compelling 140-char SEO description.
+CRITICAL FORMATTING RULE — MANDATORY:
+You MUST start your response with exactly these 4 tags on separate lines.
+Do NOT add any text, greeting, or preamble before [TITLE].
+Do NOT skip any tag.
+The format must be EXACTLY as shown below — no deviations:
+
+[TITLE] your title here
+[KEYWORDS] your keywords here
+[META] your meta description here
 [CONTENT]
-Full article HTML here using ONLY <p>, <h2>, <h3>, <strong>, <em>, <blockquote>. No markdown. No code fences.
+your full HTML article here using ONLY <p>, <h2>, <h3>, <strong>, <em>, <blockquote>. No markdown. No code fences.
 """
 
-# ── Content Generation ────────────────────────────────────
-def generate_content():
-    try:
-        completion = client.chat.completions.create(
-            messages=[{"role": "user", "content": prompt}],
-            model="llama-3.3-70b-versatile",
-            temperature=0.80,
-            max_tokens=4096,
-        )
-        raw = completion.choices[0].message.content
+# ── Robust Parser ────────────────────────────────────────
+def parse_response(raw):
+    # Normalize tag casing and spacing
+    normalized = re.sub(
+        r'\[\s*(TITLE|KEYWORDS|META|CONTENT)\s*\]',
+        lambda m: f'[{m.group(1).upper()}]',
+        raw, flags=re.IGNORECASE
+    )
 
-        title_match   = re.search(r"\[TITLE\](.*?)\[KEYWORDS\]", raw, re.DOTALL | re.IGNORECASE)
-        kw_match      = re.search(r"\[KEYWORDS\](.*?)\[META\]",   raw, re.DOTALL | re.IGNORECASE)
-        meta_match    = re.search(r"\[META\](.*?)\[CONTENT\]",    raw, re.DOTALL | re.IGNORECASE)
-        content_match = re.search(r"\[CONTENT\](.*)",             raw, re.DOTALL | re.IGNORECASE)
+    # Handle [CONTENT:] or [CONTENT :]
+    normalized = re.sub(r'\[CONTENT[:\s]*\]', '[CONTENT]', normalized, flags=re.IGNORECASE)
 
-        title    = title_match.group(1).strip() if title_match else "Exclusive: The AI Breakthrough Reshaping Tech"
-        keywords = kw_match.group(1).strip()    if kw_match   else "bright technology innovation laboratory"
-        meta_raw = meta_match.group(1).strip()  if meta_match else f"Discover the latest breakthroughs in AI and technology for {current_year}."
+    title_match   = re.search(r"\[TITLE\](.*?)(?=\[KEYWORDS\]|\[META\]|\[CONTENT\]|$)", normalized, re.DOTALL)
+    kw_match      = re.search(r"\[KEYWORDS\](.*?)(?=\[META\]|\[CONTENT\]|\[TITLE\]|$)", normalized, re.DOTALL)
+    meta_match    = re.search(r"\[META\](.*?)(?=\[CONTENT\]|\[TITLE\]|\[KEYWORDS\]|$)", normalized, re.DOTALL)
+    content_match = re.search(r"\[CONTENT\](.*)", normalized, re.DOTALL)
 
-        # Trim to 160 chars & clean
-        meta_desc = meta_raw[:160].strip()
-
-        # Remove any ## or ** or ``` leftovers from title
-        title = re.sub(r'[#*`]', '', title).strip()
-
-        if content_match:
-            content = content_match.group(1).strip()
-            # Clean markdown fences and stray backticks
-            content = re.sub(r'```[\w]*|```', '', content).strip()
-            # Remove any remaining ## headings (convert to h2)
-            content = re.sub(r'##\s+(.*?)(\n|$)', r'<h2>\1</h2>', content)
-            # Remove stray asterisks used as bold markdown
-            content = re.sub(r'\*\*(.*?)\*\*', r'<strong>\1</strong>', content)
-            content = re.sub(r'\*(.*?)\*', r'<em>\1</em>', content)
+    # ── If [CONTENT] missing, try extracting HTML block directly ──
+    if not content_match:
+        # Try to find any HTML tag as start of article body
+        html_match = re.search(r'(<(?:p|h2|h3|blockquote)[^>]*>.*)', normalized, re.DOTALL | re.IGNORECASE)
+        if html_match:
+            print("⚠️  [CONTENT] tag missing — extracted HTML body directly.")
+            content_raw = html_match.group(1)
         else:
-            print("❌ [CONTENT] tag not found in AI response.")
-            return None, None, None, None
+            # Last resort: grab everything after [META] line
+            lines = normalized.split('\n')
+            content_raw = None
+            for i, line in enumerate(lines):
+                if re.search(r'\[META\]', line, re.IGNORECASE) and i + 1 < len(lines):
+                    content_raw = '\n'.join(lines[i + 2:]).strip()
+                    print("⚠️  Fallback: extracted content after [META] line.")
+                    break
 
-        return title, keywords, meta_desc, content
+            if not content_raw:
+                print("❌ Could not extract article content from AI response.")
+                print("── RAW RESPONSE (first 500 chars) ──")
+                print(raw[:500])
+                return None, None, None, None
+    else:
+        content_raw = content_match.group(1)
 
-    except Exception as e:
-        print(f"❌ Generation error: {e}")
-        return None, None, None, None
+    # ── Extract & clean each field ──
+    title    = title_match.group(1).strip()  if title_match else "Exclusive: The AI Breakthrough Reshaping Tech"
+    keywords = kw_match.group(1).strip()     if kw_match   else "bright technology innovation laboratory"
+    meta_raw = meta_match.group(1).strip()   if meta_match else f"Discover the latest breakthroughs in AI and technology for {current_year}."
+
+    # Clean title: remove ##, **, ```, leading/trailing symbols
+    title = re.sub(r'[#*`]', '', title).strip()
+    title = re.sub(r'^[\s\-:]+|[\s\-:]+$', '', title).strip()
+
+    # Trim meta to 160 chars
+    meta_desc = meta_raw[:160].strip()
+
+    # Clean content
+    content = content_raw.strip()
+    content = re.sub(r'```[\w]*|```', '', content)
+    content = re.sub(r'##\s+(.*?)(\n|$)', r'<h2>\1</h2>', content)
+    content = re.sub(r'\*\*(.*?)\*\*', r'<strong>\1</strong>', content)
+    content = re.sub(r'\*(.*?)\*',     r'<em>\1</em>',         content)
+    content = content.strip()
+
+    return title, keywords, meta_desc, content
+
+
+# ── Content Generation (with retry) ──────────────────────
+def generate_content(max_retries=3):
+    for attempt in range(1, max_retries + 1):
+        print(f"🤖 AI attempt {attempt}/{max_retries}...")
+        try:
+            completion = client.chat.completions.create(
+                messages=[{"role": "user", "content": prompt}],
+                model="llama-3.3-70b-versatile",
+                temperature=0.80,
+                max_tokens=4096,
+            )
+            raw = completion.choices[0].message.content
+
+            result = parse_response(raw)
+            if result[0] is not None:
+                return result
+
+            print(f"⚠️  Parse failed on attempt {attempt}. Retrying...")
+
+        except Exception as e:
+            print(f"❌ API error on attempt {attempt}: {e}")
+
+    print("❌ All retries exhausted. Generation failed.")
+    return None, None, None, None
+
 
 # ── Pexels Image (bright, relevant) ──────────────────────
 def get_best_pexels_image(keywords):
-    """
-    Fetches a bright, high-quality, landscape image from Pexels.
-    Tries multiple keyword fallbacks to avoid dark/irrelevant images.
-    """
     fallback_keywords = [keywords, "technology innovation bright", "artificial intelligence future bright"]
 
     if not PEXELS_KEY:
@@ -141,11 +187,9 @@ def get_best_pexels_image(keywords):
             photos = data.get("photos", [])
 
             if photos:
-                # Pick photo with highest avg_color brightness (skip dark ones)
                 best = None
                 for photo in photos:
                     avg_color = photo.get("avg_color", "#000000")
-                    # Convert hex to brightness
                     try:
                         r = int(avg_color[1:3], 16)
                         g = int(avg_color[3:5], 16)
@@ -154,14 +198,13 @@ def get_best_pexels_image(keywords):
                     except Exception:
                         brightness = 0
 
-                    if brightness > 80:  # Only bright images
+                    if brightness > 80:
                         best = photo
                         break
 
                 if best:
                     return best["src"]["large2x"]
                 elif photos:
-                    # Fallback: take first available even if dark
                     return photos[0]["src"]["large2x"]
 
         except Exception as e:
@@ -169,6 +212,7 @@ def get_best_pexels_image(keywords):
             continue
 
     return f"https://picsum.photos/seed/{urllib.parse.quote(keywords)}/1200/628"
+
 
 # ── Magazine-Quality HTML Builder ────────────────────────
 def build_html(title, meta_desc, image_url, article_body):
@@ -210,7 +254,6 @@ def build_html(title, meta_desc, image_url, article_body):
     -webkit-font-smoothing: antialiased;
   }}
 
-  /* ── TOP BAR ── */
   .top-bar {{
     background: var(--ink);
     color: var(--white);
@@ -222,7 +265,6 @@ def build_html(title, meta_desc, image_url, article_body):
     text-transform: uppercase;
   }}
 
-  /* ── MASTHEAD ── */
   .masthead {{
     border-bottom: 3px double var(--ink);
     padding: 18px 20px 14px;
@@ -257,14 +299,12 @@ def build_html(title, meta_desc, image_url, article_body):
     font-style: normal;
   }}
 
-  /* ── ARTICLE WRAPPER ── */
   .article-wrap {{
     max-width: 740px;
     margin: 0 auto;
     padding: 40px 24px 80px;
   }}
 
-  /* ── CATEGORY TAG ── */
   .category-tag {{
     display: inline-block;
     background: var(--accent);
@@ -278,7 +318,6 @@ def build_html(title, meta_desc, image_url, article_body):
     margin-bottom: 20px;
   }}
 
-  /* ── HEADLINE ── */
   h1.headline {{
     font-family: 'Playfair Display', serif;
     font-size: clamp(30px, 5vw, 48px);
@@ -289,7 +328,6 @@ def build_html(title, meta_desc, image_url, article_body):
     letter-spacing: -0.01em;
   }}
 
-  /* ── DECK / SUBHEAD ── */
   .deck {{
     font-family: 'DM Sans', sans-serif;
     font-size: 15px;
@@ -301,7 +339,6 @@ def build_html(title, meta_desc, image_url, article_body):
     margin-bottom: 22px;
   }}
 
-  /* ── BYLINE ── */
   .byline {{
     font-family: 'DM Sans', sans-serif;
     font-size: 12px;
@@ -314,7 +351,6 @@ def build_html(title, meta_desc, image_url, article_body):
     font-weight: 500;
   }}
 
-  /* ── FEATURED IMAGE ── */
   .featured-image-wrap {{
     margin: 0 -24px 36px;
     position: relative;
@@ -333,14 +369,12 @@ def build_html(title, meta_desc, image_url, article_body):
     letter-spacing: 0.02em;
   }}
 
-  /* ── ARTICLE CONTENT ── */
   .content p {{
     margin-bottom: 26px;
     color: var(--ink-light);
     hyphens: auto;
   }}
 
-  /* Drop cap on first paragraph */
   .content > p:first-child::first-letter {{
     font-family: 'Playfair Display', serif;
     font-size: 72px;
@@ -398,7 +432,6 @@ def build_html(title, meta_desc, image_url, article_body):
   .content strong {{ color: var(--ink); font-weight: 600; }}
   .content em {{ font-style: italic; }}
 
-  /* ── PULL QUOTE RULE ── */
   .pull-rule {{
     text-align: center;
     color: var(--rule);
@@ -407,7 +440,6 @@ def build_html(title, meta_desc, image_url, article_body):
     margin: 40px 0;
   }}
 
-  /* ── FOOTER ── */
   .article-footer {{
     margin-top: 60px;
     padding-top: 24px;
@@ -465,10 +497,11 @@ def build_html(title, meta_desc, image_url, article_body):
 </html>
 """
 
+
 # ── Send Email ────────────────────────────────────────────
 def send_email(title, html_body):
     msg            = MIMEText(html_body, 'html', 'utf-8')
-    msg['Subject'] = title          # Clean title, no ## symbols
+    msg['Subject'] = title
     msg['From']    = MY_GMAIL
     msg['To']      = BLOGGER_MAIL
 
@@ -483,6 +516,7 @@ def send_email(title, html_body):
         print(f"❌ SMTP Error: {e}")
     except Exception as e:
         print(f"❌ General Error: {e}")
+
 
 # ── Main ──────────────────────────────────────────────────
 def main():
