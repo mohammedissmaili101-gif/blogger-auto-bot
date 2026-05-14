@@ -2,8 +2,8 @@ name: Blogger Professional Bot
 
 on:
   schedule:
-    - cron: '0 */8 * * *' # النشر كل 8 سوايع أوتوماتيكياً
-  workflow_dispatch: # تشغيل يدوي للتجربة من واجهة GitHub
+    - cron: '0 */8 * * *' 
+  workflow_dispatch: # هادي كتخليك تخدمو بيدك من زر Run Workflow
 
 jobs:
   post_job:
@@ -18,8 +18,9 @@ jobs:
           python-version: '3.9'
 
       - name: Install Dependencies
-        # زدنا requests و Pexels API محتاج ليها الكود دابا
-        run: pip install groq requests
+        run: |
+          python -m pip install --upgrade pip
+          pip install groq requests
 
       - name: Run Auto Bot
         env:
@@ -27,5 +28,6 @@ jobs:
           GMAIL_APP_PASSWORD: ${{ secrets.GMAIL_APP_PASSWORD }}
           BLOGGER_EMAIL: ${{ secrets.BLOGGER_EMAIL }}
           MY_GMAIL: ${{ secrets.MY_GMAIL }}
-          PEXELS_API_KEY: ${{ secrets.PEXELS_API_KEY }} # تأكد أنك زدتي هاد الساروت في Secrets
+          PEXELS_API_KEY: ${{ secrets.PEXELS_API_KEY }}
+        # تأكد 100% أن ملف الكود سميتو main.py في المستودع (Repository)
         run: python main.py
