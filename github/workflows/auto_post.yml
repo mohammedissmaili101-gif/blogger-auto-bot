@@ -2,8 +2,8 @@ name: Blogger Professional Bot
 
 on:
   schedule:
-    - cron: '0 */8 * * *' # كينشر كل 8 سوايع (3 مقالات فاليوم)
-  workflow_dispatch: # باش تقدر تخدمو يدوياً دابا نيت
+    - cron: '0 */8 * * *' # النشر كل 8 سوايع
+  workflow_dispatch: # تشغيل يدوي للتجربة
 
 jobs:
   post_job:
@@ -17,7 +17,7 @@ jobs:
         with:
           python-version: '3.9'
 
-      - name: Install Groq Library
+      - name: Install Dependencies
         run: pip install groq
 
       - name: Run Auto Bot
