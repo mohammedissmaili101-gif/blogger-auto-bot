@@ -53,8 +53,8 @@ Structure: [TITLE], [KEYWORDS], [META], [CONTENT] (using only HTML tags like <p>
 
 # ── Robust Parser (FIXED SYNTAX ERROR) ───────────────────
 def parse_response(raw):
-    # استخدام raw string لتفادي SyntaxError
-    raw_clean = re.sub(r'[*#]', '', raw)
+    # تنظيف بدائي للرموز اللي كدير مشاكل
+    raw_clean = raw.replace('**', '').replace('#', '')
     
     title_match = re.search(r"\[TITLE\]\s*(.*)", raw_clean, re.IGNORECASE)
     kw_match    = re.search(r"\[KEYWORDS\]\s*(.*)", raw_clean, re.IGNORECASE)
@@ -70,10 +70,11 @@ def parse_response(raw):
     if content_match:
         content = content_match.group(1).strip()
     else:
+        # البحث عن أول وسم HTML إذا فشل الـ Parser
         html_start = re.search(r"(<p>|<h2>).*", raw, re.DOTALL | re.IGNORECASE)
         content = html_start.group(0) if html_start else raw
 
-    # Fix code blocks and markdown
+    # تنظيف كود الماركداون بـ regex آمن
     content = re.sub(r'```.*?```', '', content, flags=re.DOTALL)
     return title, keywords, meta_desc, content
 
@@ -82,9 +83,9 @@ def generate_content():
     try:
         completion = client.chat.completions.create(
             messages=[{"role": "user", "content": prompt}],
-            # تبديل الموديل لتفادي الـ Rate Limit
-            model="llama3-70b-8192", 
-            temperature=0.7,
+            # الموديل المحدث والمتاح حالياً
+            model="llama-3.3-70b-versatile", 
+            temperature=0.8,
             max_tokens=3500,
         )
         return parse_response(completion.choices[0].message.content)
@@ -106,9 +107,12 @@ def get_best_pexels_image(keywords):
 # ── HTML & Email ──────────────────────────────────────────
 def build_html(title, image_url, article_body):
     return f"""
-    <div dir="ltr" style="font-family: Georgia, serif; line-height: 1.8; font-size: 19px; max-width: 800px; margin: auto;">
-        <img src="{image_url}" style="width: 100%; border-radius: 8px;" alt="{title}">
-        <div style="margin-top: 20px;">{article_body}</div>
+    <div dir="ltr" style="font-family: Georgia, serif; line-height: 1.8; font-size: 19px; max-width: 800px; margin: auto; padding: 20px; color: #333;">
+        <img src="{image_url}" style="width: 100%; border-radius: 8px; margin-bottom: 25px;" alt="{title}">
+        <div class="content">{article_body}</div>
+        <p style="margin-top: 40px; border-top: 1px solid #eee; padding-top: 10px; color: #999; font-size: 14px;">
+            Published via Smart Flow Lab | {today_date}
+        </p>
     </div>
     """
 
@@ -126,9 +130,11 @@ def send_email(title, html_body):
         print(f"❌ SMTP Error: {e}")
 
 def main():
-    print("🚀 Starting Bot...")
+    print("🚀 Bot starting...")
     title, keywords, meta, content = generate_content()
-    if title and len(content) > 500:
+    
+    # التأكد من أن المقال طويل كفاية (لـ Google Ads)
+    if title and len(content) > 600:
         img = get_best_pexels_image(keywords)
         html = build_html(title, img, content)
         send_email(title, html)
