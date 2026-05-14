@@ -1,0 +1,29 @@
+name: Blogger Professional Bot
+
+on:
+  schedule:
+    - cron: '0 */8 * * *' # كينشر كل 8 سوايع (3 مقالات فاليوم)
+  workflow_dispatch: # باش تقدر تخدمو يدوياً دابا نيت
+
+jobs:
+  post_job:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout Code
+        uses: actions/checkout@v3
+
+      - name: Setup Python
+        uses: actions/setup-python@v4
+        with:
+          python-version: '3.9'
+
+      - name: Install Groq Library
+        run: pip install groq
+
+      - name: Run Auto Bot
+        env:
+          GROQ_API_KEY: ${{ secrets.GROQ_API_KEY }}
+          GMAIL_APP_PASSWORD: ${{ secrets.GMAIL_APP_PASSWORD }}
+          BLOGGER_EMAIL: ${{ secrets.BLOGGER_EMAIL }}
+          MY_GMAIL: ${{ secrets.MY_GMAIL }}
+        run: python main.py
