@@ -3,7 +3,7 @@ name: Blogger Professional Bot
 on:
   schedule:
     - cron: '0 */8 * * *' 
-  workflow_dispatch: # هادي كتخليك تخدمو بيدك من زر Run Workflow
+  workflow_dispatch: 
 
 jobs:
   post_job:
@@ -20,14 +20,13 @@ jobs:
       - name: Install Dependencies
         run: |
           python -m pip install --upgrade pip
-          pip install google-generativeai requests
+          pip install requests  # Hugging Face يحتاج فقط مكتبة requests
 
       - name: Run Auto Bot
         env:
-          GEMINI_API_KEY: ${{ secrets.GEMINI_API_KEY }}
+          HF_TOKEN: ${{ secrets.HF_TOKEN }} # السيكريت الجديد
           GMAIL_APP_PASSWORD: ${{ secrets.GMAIL_APP_PASSWORD }}
           BLOGGER_EMAIL: ${{ secrets.BLOGGER_EMAIL }}
           MY_GMAIL: ${{ secrets.MY_GMAIL }}
           PEXELS_API_KEY: ${{ secrets.PEXELS_API_KEY }}
-        # تأكد أن ملف الكود اللي فيه نسخة Gemini سميتو main.py
         run: python main.py
