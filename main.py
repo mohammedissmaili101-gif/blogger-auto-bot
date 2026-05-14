@@ -8,15 +8,15 @@ import random
 import time
 from email.mime.text import MIMEText
 
-# ── Secrets (تبديل GROQ بـ Hugging Face) ─────────────────
+# ── Secrets ──────────────────────────────────────────────
 HF_TOKEN     = os.environ.get("HF_TOKEN")
 GMAIL_PASS   = os.environ.get("GMAIL_APP_PASSWORD")
 BLOGGER_MAIL = os.environ.get("BLOGGER_EMAIL")
 MY_GMAIL     = os.environ.get("MY_GMAIL")
 PEXELS_KEY   = os.environ.get("PEXELS_API_KEY")
 
-# إعدادات الموديل (Llama 3 8B Instruct - سريع ومستقر)
-API_URL = "https://api-inference.huggingface.co/models/meta-llama/Meta-Llama-3-8B-Instruct"
+# التعديل هنا: استهداف موديل Mistral المفتوح للجميع
+API_URL = "https://api-inference.huggingface.co/models/mistralai/Mistral-7B-Instruct-v0.3"
 headers = {"Authorization": f"Bearer {HF_TOKEN}"}
 
 today_date   = datetime.date.today().strftime("%B %d, %Y")
@@ -38,15 +38,13 @@ random_modifier = random.choice([
 
 chosen_topic = random.choice(TOPIC_ANGLES)
 
-# ── Prompt ───────────────────────────────────────────────
-# زدنا تعليمات باش الموديل يكمل المقال وما يحبسش
-prompt = f"<|begin_of_text|><|start_header_id|>user<|end_header_id|>\n\nCurrent Date: {today_date}\nAngle: {random_modifier}\nStory: {chosen_topic}\n\nWrite an investigative article (Min 1000 words). \nStructure: [TITLE], [KEYWORDS], [META], [CONTENT] (using only HTML tags like <p>, <h2>, <strong>).\n\nFocus on technical depth and exclusive leaks.<|eot_id|><|start_header_id|>assistant<|end_header_id|>\n\n"
+# ── Prompt (معدل ليتناسب مع Mistral) ─────────────────────
+prompt = f"<s>[INST] Current Date: {today_date}\nAngle: {random_modifier}\nStory: {chosen_topic}\n\nWrite an investigative article (Min 1000 words). \nStructure: [TITLE], [KEYWORDS], [META], [CONTENT] (using only HTML tags like <p>, <h2>, <strong>). Focus on technical depth and exclusive leaks. [/INST]"
 
 # ── Robust Parser ────────────────────────────────────────
 def parse_response(raw):
-    # تنظيف الرد من الـ Tags ديال Llama 3
-    raw_clean = re.sub(r'<\|.*?\|>', '', raw)
-    raw_clean = re.sub(r'[*#]', '', raw_clean)
+    # تنظيف الماركداون
+    raw_clean = re.sub(r'[*#]', '', raw)
     
     title_match = re.search(r"\[TITLE\]\s*(.*)", raw_clean, re.IGNORECASE)
     kw_match    = re.search(r"\[KEYWORDS\]\s*(.*)", raw_clean, re.IGNORECASE)
@@ -60,22 +58,19 @@ def parse_response(raw):
     if content_match:
         content = content_match.group(1).strip()
     else:
-        # البحث عن أول وسم HTML
         html_start = re.search(r"(<p>|<h2>).*", raw_clean, re.DOTALL | re.IGNORECASE)
         content = html_start.group(0) if html_start else raw_clean
 
     return title[:65], keywords, meta_desc, content
 
-# ── Content Generation (Hugging Face) ─────────────────────
+# ── Content Generation (Mistral) ──────────────────────────
 def generate_content():
     try:
-        # Hugging Face كيحتاج payload خاص
         payload = {
             "inputs": prompt,
             "parameters": {
-                "max_new_tokens": 2500, # باش يعطينا مقال طويل
+                "max_new_tokens": 2000,
                 "temperature": 0.7,
-                "top_p": 0.9,
                 "return_full_text": False
             }
         }
@@ -84,13 +79,12 @@ def generate_content():
         
         if response.status_code == 200:
             result = response.json()
-            # Hugging Face كيرجع List
             raw_text = result[0]['generated_text'] if isinstance(result, list) else result['generated_text']
             return parse_response(raw_text)
         elif response.status_code == 503:
-            print("⏳ Model is loading on Hugging Face, waiting 20s...")
+            print("⏳ Mistral is loading... waiting 20s")
             time.sleep(20)
-            return generate_content() # إعادة المحاولة
+            return generate_content()
         else:
             print(f"❌ HF Error: {response.status_code} - {response.text}")
             return None, None, None, None
@@ -98,7 +92,7 @@ def generate_content():
         print(f"❌ Generation Error: {e}")
         return None, None, None, None
 
-# ── Pexels & Email (نفس الكود ديالك بلا تغيير) ─────────────
+# ── Pexels & Email ────────────────────────────────────────
 def get_best_pexels_image(keywords):
     if not PEXELS_KEY: return "https://picsum.photos/1200/630"
     try:
@@ -108,15 +102,16 @@ def get_best_pexels_image(keywords):
     except: return "https://picsum.photos/1200/630"
 
 def main():
-    print("🚀 Starting HF-Powered Bot...")
+    print("🚀 Starting Mistral-Powered Bot (No waiting for Meta approval)...")
     title, keywords, meta, content = generate_content()
     
-    if title and len(content) > 600:
+    if title and len(content) > 500:
         img = get_best_pexels_image(keywords)
         html = f"""
-        <div dir="ltr" style="font-family: Arial; line-height: 1.8; font-size: 18px; color: #333;">
-            <img src="{img}" style="width: 100%; border-radius: 8px;" alt="{title}">
-            <div style="margin-top: 20px;">{content}</div>
+        <div dir="ltr" style="font-family: 'Segoe UI', Arial; line-height: 1.8; font-size: 18px; color: #1a1a1a;">
+            <img src="{img}" style="width: 100%; border-radius: 8px; margin-bottom: 20px;" alt="{title}">
+            {content}
+            <p style="margin-top: 30px; color: #888; font-size: 12px; text-align: center;">© 2026 Smart Flow Lab. All Rights Reserved.</p>
         </div>
         """
         msg = MIMEText(html, 'html', 'utf-8')
@@ -128,7 +123,7 @@ def main():
             with smtplib.SMTP_SSL('smtp.gmail.com', 465) as server:
                 server.login(MY_GMAIL, GMAIL_PASS)
                 server.send_message(msg)
-            print(f"✅ Published to Blogger: {title}")
+            print(f"✅ Published: {title}")
         except Exception as e: print(f"❌ Email Error: {e}")
     else:
         print("❌ Generation failed or content too short.")
