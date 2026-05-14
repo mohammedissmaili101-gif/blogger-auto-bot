@@ -15,7 +15,7 @@ BLOGGER_MAIL = os.environ.get("BLOGGER_EMAIL")
 MY_GMAIL     = os.environ.get("MY_GMAIL")
 PEXELS_KEY   = os.environ.get("PEXELS_API_KEY")
 
-# التعديل هنا: استهداف موديل Mistral المفتوح للجميع
+# التصحيح: رابط الموديل بدقة (Mistral-7B-Instruct-v0.3)
 API_URL = "https://api-inference.huggingface.co/models/mistralai/Mistral-7B-Instruct-v0.3"
 headers = {"Authorization": f"Bearer {HF_TOKEN}"}
 
@@ -30,22 +30,14 @@ TOPIC_ANGLES = [
     f"the battle between OpenAI vs Google vs Meta in {current_year}",
 ]
 
-random_modifier = random.choice([
-    "Focus on a hidden scandal or controversy.",
-    "Highlight the extreme financial implications.",
-    "Make the title sound like a high-stakes thriller headline."
-])
-
 chosen_topic = random.choice(TOPIC_ANGLES)
 
-# ── Prompt (معدل ليتناسب مع Mistral) ─────────────────────
-prompt = f"<s>[INST] Current Date: {today_date}\nAngle: {random_modifier}\nStory: {chosen_topic}\n\nWrite an investigative article (Min 1000 words). \nStructure: [TITLE], [KEYWORDS], [META], [CONTENT] (using only HTML tags like <p>, <h2>, <strong>). Focus on technical depth and exclusive leaks. [/INST]"
+# ── Prompt ───────────────────────────────────────────────
+prompt = f"<s>[INST] Write an investigative article about {chosen_topic}. Min 1000 words. Structure: [TITLE], [KEYWORDS], [META], [CONTENT] (using only HTML tags like <p>, <h2>, <strong>). [/INST]"
 
 # ── Robust Parser ────────────────────────────────────────
 def parse_response(raw):
-    # تنظيف الماركداون
     raw_clean = re.sub(r'[*#]', '', raw)
-    
     title_match = re.search(r"\[TITLE\]\s*(.*)", raw_clean, re.IGNORECASE)
     kw_match    = re.search(r"\[KEYWORDS\]\s*(.*)", raw_clean, re.IGNORECASE)
     meta_match  = re.search(r"\[META\]\s*(.*)", raw_clean, re.IGNORECASE)
@@ -63,18 +55,20 @@ def parse_response(raw):
 
     return title[:65], keywords, meta_desc, content
 
-# ── Content Generation (Mistral) ──────────────────────────
+# ── Content Generation ────────────────────────────────────
 def generate_content():
     try:
+        # تأكدنا أن الـ payload مقاد مزيان
         payload = {
             "inputs": prompt,
             "parameters": {
-                "max_new_tokens": 2000,
+                "max_new_tokens": 1500,
                 "temperature": 0.7,
                 "return_full_text": False
             }
         }
         
+        # درنا POST للرابط المصحح
         response = requests.post(API_URL, headers=headers, json=payload, timeout=120)
         
         if response.status_code == 200:
@@ -82,10 +76,11 @@ def generate_content():
             raw_text = result[0]['generated_text'] if isinstance(result, list) else result['generated_text']
             return parse_response(raw_text)
         elif response.status_code == 503:
-            print("⏳ Mistral is loading... waiting 20s")
+            print("⏳ Model is loading... waiting 20s")
             time.sleep(20)
             return generate_content()
         else:
+            # هاد السطر غادي يوريك بالضبط شنو الخطأ إيلا بقى
             print(f"❌ HF Error: {response.status_code} - {response.text}")
             return None, None, None, None
     except Exception as e:
@@ -102,16 +97,15 @@ def get_best_pexels_image(keywords):
     except: return "https://picsum.photos/1200/630"
 
 def main():
-    print("🚀 Starting Mistral-Powered Bot (No waiting for Meta approval)...")
+    print("🚀 Starting Mistral-Powered Bot...")
     title, keywords, meta, content = generate_content()
     
-    if title and len(content) > 500:
+    if title and content and len(content) > 300:
         img = get_best_pexels_image(keywords)
         html = f"""
-        <div dir="ltr" style="font-family: 'Segoe UI', Arial; line-height: 1.8; font-size: 18px; color: #1a1a1a;">
-            <img src="{img}" style="width: 100%; border-radius: 8px; margin-bottom: 20px;" alt="{title}">
-            {content}
-            <p style="margin-top: 30px; color: #888; font-size: 12px; text-align: center;">© 2026 Smart Flow Lab. All Rights Reserved.</p>
+        <div dir="ltr" style="font-family: Arial; line-height: 1.8; font-size: 18px;">
+            <img src="{img}" style="width: 100%; border-radius: 8px;">
+            <div style="margin-top: 20px;">{content}</div>
         </div>
         """
         msg = MIMEText(html, 'html', 'utf-8')
@@ -126,7 +120,7 @@ def main():
             print(f"✅ Published: {title}")
         except Exception as e: print(f"❌ Email Error: {e}")
     else:
-        print("❌ Generation failed or content too short.")
+        print("❌ Generation failed.")
 
 if __name__ == "__main__":
     main()
