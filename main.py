@@ -14,7 +14,6 @@ MY_GMAIL = os.environ.get("MY_GMAIL")
 client = Groq(api_key=GROQ_KEY)
 
 # 2. البرومبت "الصحفي" لضمان جودة Google News
-# طلبت منو يخرج لينا العنوان، الكلمات المفتاحية للصورة، والمحتوى بوحدهم
 prompt = """
 Act as an expert tech journalist for a world-class magazine like 'The Verge' or 'Wired'. 
 Task: Write a high-impact, professional article in English.
@@ -34,12 +33,12 @@ def generate_content():
     try:
         completion = client.chat.completions.create(
             messages=[{"role": "user", "content": prompt}],
-            model="llama3-70b-8192", # النسخة الأقوى لضمان "بشرية" المقال
-            temperature=0.6, # توازن بين الإبداع والدقة
+            model="llama3-70b-8192", 
+            temperature=0.6, 
         )
         raw_text = completion.choices[0].message.content
         
-        # تقسيم الاستجابة
+        # تقسيم الاستجابة بدقة
         title = re.search(r"TITLE:(.*)", raw_text).group(1).strip()
         keywords = re.search(r"KEYWORDS:(.*)", raw_text).group(1).strip().replace(" ", "")
         content = raw_text.split("CONTENT:")[1].strip()
@@ -49,9 +48,8 @@ def generate_content():
         print(f"Error generating content: {e}")
         return None, None, None
 
-# 3. جلب صورة مطابقة للموضوع (High Quality & Relevant)
+# 3. جلب صورة مطابقة للموضوع
 def get_relevant_image(keywords):
-    # كنستعملو هاد المحرك كيجيب صور حقيقية من Unsplash/Flickr بناء على الكلمات المفتاحية
     return f"https://loremflickr.com/1200/630/{keywords}/all"
 
 title, keywords, article_body = generate_content()
@@ -72,9 +70,10 @@ if title:
     </div>
     """
 
-    # 5. إرسال الإيميل
+    # 5. إرسال الإيميل مع إضافة Label التصنيف (News)
     msg = MIMEText(full_html, 'html')
-    msg['Subject'] = title
+    # إضافة #News للعنوان باش بلوجر يصنفو تلقائياً
+    msg['Subject'] = f"{title} #News" 
     msg['From'] = MY_GMAIL
     msg['To'] = BLOGGER_MAIL
 
@@ -82,6 +81,6 @@ if title:
         with smtplib.SMTP_SSL('smtp.gmail.com', 465) as server:
             server.login(MY_GMAIL, GMAIL_PASS)
             server.send_message(msg)
-        print(f"✅ Success! Published: {title}")
+        print(f"✅ Success! Published in News: {title}")
     except Exception as e:
         print(f"❌ Mail Error: {e}")
