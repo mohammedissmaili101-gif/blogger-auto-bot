@@ -14,9 +14,8 @@ BLOGGER_MAIL = os.environ.get("BLOGGER_EMAIL")
 MY_GMAIL     = os.environ.get("MY_GMAIL")
 PEXELS_KEY   = os.environ.get("PEXELS_API_KEY")
 
-client     = Groq(api_key=GROQ_KEY)
-# استعملت التاريخ الحالي ديال 2026 كيفما طلبتي
-today_date = datetime.date.today().strftime("%B %d, %Y")
+client       = Groq(api_key=GROQ_KEY)
+today_date   = datetime.date.today().strftime("%B %d, %2026")
 current_year = 2026
 
 # ── Prompt ───────────────────────────────────────────────
@@ -41,20 +40,20 @@ def generate_content():
         raw = completion.choices[0].message.content
 
         # Extraction using Regex
-        title_search = re.search(r"\[TITLE\](.*?)\[", raw, re.S | re.I)
-        kw_search = re.search(r"\[KEYWORDS\](.*?)\[", raw, re.S | re.I)
-        meta_search = re.search(r"\[META\](.*?)\[", raw, re.S | re.I)
-        content_search = re.search(r"\[CONTENT\](.*)", raw, re.S | re.I)
+        title_match = re.search(r"\[TITLE\](.*?)\[", raw, re.S | re.I)
+        kw_match    = re.search(r"\[KEYWORDS\](.*?)\[", raw, re.S | re.I)
+        meta_match   = re.search(r"\[META\](.*?)\[", raw, re.S | re.I)
+        content_match = re.search(r"\[CONTENT\](.*)", raw, re.S | re.I)
 
-        title = title_search.group(1).strip() if title_search else "Tech Evolution 2026"
-        keywords = kw_search.group(1).strip() if kw_search else "future technology"
-        # تم إصلاح القوس الزائد هنا
-        meta = meta_search.group(1).strip() if meta_search else "Exclusive look at the future of tech."
+        title    = title_match.group(1).strip() if title_match else "Tech Evolution 2026"
+        keywords = kw_match.group(1).strip() if kw_match else "future technology"
+        meta     = meta_match.group(1).strip() if meta_match else "Exclusive look at the future of tech."
         
-        if content_search:
-            article = content_search.group(1).strip()
-            article = article.replace("```html", "").replace("
-```", "").strip()
+        if content_match:
+            article = content_match.group(1).strip()
+            # إصلاح نهائي ومنظم لتنظيف الكود بلا مشاكل Syntax
+            article = article.replace('```html', '').replace('
+```', '').strip()
         else:
             return None, None, None, None
 
@@ -66,32 +65,48 @@ def generate_content():
 def get_pexels_image(keywords):
     if not PEXELS_KEY: return "https://picsum.photos/1200/630"
     try:
-        url = f"https://api.pexels.com/v1/search?query={keywords}&per_page=1&orientation=landscape"
+        query = urllib.parse.quote(keywords)
+        url = f"https://api.pexels.com/v1/search?query={query}&per_page=1&orientation=landscape"
         r = requests.get(url, headers={"Authorization": PEXELS_KEY}, timeout=10)
-        return r.json()['photos'][0]['src']['large2x']
-    except:
-        return f"https://picsum.photos/seed/{urllib.parse.quote(keywords)}/1200/630"
+        data = r.json()
+        if 'photos' in data and len(data['photos']) > 0:
+            return data['photos'][0]['src']['large2x']
+    except Exception as e:
+        print(f"⚠️ Pexels error: {e}")
+    
+    return f"https://picsum.photos/seed/{urllib.parse.quote(keywords)}/1200/630"
 
 # ── Build & Send ──────────────────────────────────────────
 t, k, m, body = generate_content()
 
 if t and body:
-    img = get_pexels_image(k)
+    img_url = get_pexels_image(k)
     
-    # استعملت f-strings عادية لتفادي مشاكل الأقواس في القالب
-    full_html = f"""
-    <html>
-    <head><meta name="description" content="{m}"></head>
-    <body style="font-family: 'Segoe UI', sans-serif; line-height: 1.8; color: #333; max-width: 800px; margin: auto; padding: 20px;">
-        <span style="color: #1a73e8; font-weight: bold; text-transform: uppercase;">Exclusive Report</span>
-        <h1 style="font-size: 38px; margin-top: 10px;">{t}</h1>
-        <p style="color: #777; border-bottom: 1px solid #eee; padding-bottom: 15px;">Smart Flow Lab | {today_date}</p>
-        <img src="{img}" style="width: 100%; border-radius: 12px; margin: 20px 0;">
-        <div style="font-size: 19px;">{body}</div>
-        <div style="margin-top: 40px; text-align: center; font-size: 12px; color: #aaa;">© {current_year} Smart Flow Lab</div>
-    </body>
-    </html>
-    """
+    full_html = f"""<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="description" content="{m}">
+</head>
+<body style="font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif; line-height: 1.8; color: #333; max-width: 850px; margin: 0 auto; padding: 30px;">
+    <header>
+        <strong style="color: #1a73e8; text-transform: uppercase; letter-spacing: 1px;">Exclusive Tech Report</strong>
+        <h1 style="font-size: 42px; margin-top: 10px; line-height: 1.2; color: #111;">{t}</h1>
+        <p style="color: #666; font-size: 14px; border-bottom: 2px solid #f4f4f4; padding-bottom: 20px;">By Smart Flow Lab | {today_date}</p>
+    </header>
+    
+    <main>
+        <img src="{img_url}" alt="Feature Image" style="width: 100%; border-radius: 15px; margin-bottom: 30px; box-shadow: 0 10px 20px rgba(0,0,0,0.1);">
+        <div style="font-size: 20px; color: #444; text-align: justify;">
+            {body}
+        </div>
+    </main>
+
+    <footer style="margin-top: 50px; padding-top: 20px; border-top: 1px solid #eee; text-align: center; color: #888; font-size: 13px;">
+        © {current_year} Smart Flow Lab - Digital Intelligence Hub
+    </footer>
+</body>
+</html>"""
 
     msg = MIMEText(full_html, 'html', 'utf-8')
     msg['Subject'] = t
@@ -102,6 +117,8 @@ if t and body:
         with smtplib.SMTP_SSL('smtp.gmail.com', 465) as server:
             server.login(MY_GMAIL, GMAIL_PASS)
             server.send_message(msg)
-        print(f"✅ Published: {t}")
+        print(f"✅ Successfully Published: {t}")
     except Exception as e:
-        print(f"❌ Mail Error: {e}")
+        print(f"❌ SMTP Error: {e}")
+else:
+    print("❌ Critical Failure: Content not generated correctly.")
