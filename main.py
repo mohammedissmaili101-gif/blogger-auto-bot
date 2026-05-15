@@ -108,6 +108,33 @@ def markdown_to_html(text):
         html_lines.append('</ul>')
     return '\n'.join(html_lines)
 
+def post_process_html(html):
+    """
+    Cleans AI-generated HTML after generation:
+    1. Removes duplicate consecutive <h2> with same text.
+    2. Replaces named person attributions with anonymous role.
+    """
+    # ── 1. Remove duplicate <h2> ──────────────────────────
+    seen_h2 = []
+    def dedup_h2(m):
+        text = m.group(1).strip().lower()
+        if text in seen_h2:
+            return ''
+        seen_h2.append(text)
+        return m.group(0)
+    html = re.sub(r'<h2[^>]*>(.*?)</h2>', dedup_h2, html, flags=re.IGNORECASE | re.DOTALL)
+
+    # ── 2. Replace "— Dr. Real Name, Title at Org" with anonymous ──
+    # Catches:  — Dr. Maria Zuber, Director of MIT ...
+    #           — John Smith, Head of Research at ...
+    html = re.sub(
+        r'—\s*(?:Dr\.|Prof\.|Mr\.|Ms\.|Mrs\.)?\s*[A-Z][a-z]+(?:\s+[A-Z][a-z]+)+[^<\n]{0,150}',
+        '— <em>Senior industry analyst</em>',
+        html
+    )
+
+    return html
+
 def groq_call(system_msg, user_msg, max_tokens=2000):
     for attempt in range(1, 4):
         try:
@@ -150,36 +177,41 @@ def generate_meta(topic):
 
     return title, keywords, meta
 
-# ── FIX 2: Stronger prompt for pure HTML output ───────────
+# ── FIX 2: Anti-hallucination article generator ───────────
 def generate_article(title, topic):
-    system_msg = """You are a Senior Investigative Tech Journalist writing for a professional news outlet.
+    system_msg = """You are a Senior Tech Analyst writing an industry analysis report. 
 
-STRICT OUTPUT RULES:
-1. Output ONLY valid HTML using <h2>, <p>, <blockquote>, <ul>, <li>, <strong> tags.
-2. NEVER use Markdown syntax like **bold**, *italic*, or bullet lines starting with * or -.
-3. FACTUALITY: Do NOT invent capabilities for real AI systems (e.g., AlphaGo only plays Go).
-4. SOURCES: Do NOT invent quotes from real named individuals. Use:
-   - "Industry analysts suggest..."
-   - "According to recent corporate filings..."
-   - "Researchers at [Institution] have noted..."
-5. TONE: Serious, analytical, objective. No hype words like "revolutionary" or "mind-blowing".
-6. DATA-DRIVEN: Reference real trends, published benchmarks, or regulatory actions where possible.
-7. STRUCTURE: Introduction → 2-3 analysis sections with <h2> → Expert perspective <blockquote> → Conclusion."""
+ABSOLUTE RULES — violation = unusable article:
+1. HTML ONLY: use <h2>, <p>, <blockquote>, <ul>, <li>, <strong>. Zero Markdown.
+2. NO INVENTED PEOPLE: Never write "Jane Smith, Director at X said...". 
+   Instead use ONLY: "Industry analysts suggest...", "Observers note...", 
+   "According to market research...", "Sector reports indicate..."
+3. NO INVENTED PRODUCTS: Do NOT name fake models, papers, or projects 
+   (e.g., "EffTrans", "LinguaCore"). Discuss real, confirmed trends only.
+4. NO FAKE STATISTICS: Do NOT write "reduces costs by 90%" unless it is 
+   publicly confirmed. Use ranges: "estimates vary between X and Y".
+5. BLOCKQUOTE = anonymous industry voice only: 
+   <blockquote>"..." — <em>Senior analyst, AI infrastructure sector</em></blockquote>
+6. TONE: Analytical, cautious, objective. No hype."""
 
     user_msg = (
-        f"Write an 800-word authoritative HTML report.\n"
-        f"Headline: {title}\n"
-        f"Focus: {topic}\n"
-        f"Current Date: {today_date}\n\n"
-        "Remember: pure HTML only, zero Markdown."
+        f"Write a 700-word industry analysis in HTML.\n"
+        f"Title: {title}\n"
+        f"Topic: {topic}\n"
+        f"Date: {today_date}\n\n"
+        "Structure: intro <p> → 2 sections <h2>+<p> → insight <blockquote> → conclusion <p>.\n"
+        "Pure HTML only. No invented names, no invented products, no fake numbers."
     )
 
     raw = groq_call(system_msg, user_msg)
     if not raw:
         return None
 
-    # FIX 1 applied as safety net even with the stronger prompt
-    return markdown_to_html(raw)
+    # Step 1: Convert any leftover Markdown → HTML
+    cleaned = markdown_to_html(raw)
+    # Step 2: Remove duplicate headings + named attributions
+    cleaned = post_process_html(cleaned)
+    return cleaned
 
 # ── FIX 3: Topic-aware image search ──────────────────────
 def get_best_pexels_image(image_queries):
