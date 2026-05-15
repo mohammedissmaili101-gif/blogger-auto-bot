@@ -44,7 +44,7 @@ def post_to_blogger_api(title, html_content):
             "kind": "blogger#post",
             "title": title,
             "content": html_content,
-            "labels": ["News"] # تم التعديل هنا ليكون News فقط
+            "labels": ["News"]
         }
         
         service.posts().insert(blogId=blog_id, body=body).execute()
@@ -52,24 +52,26 @@ def post_to_blogger_api(title, html_content):
     except Exception as e:
         print(f"❌ Blogger API Error: {e}")
 
-# ── Topics for High Traffic ────────────────────────
+# ── Smart Topics Rotation ────────────────────────
 TOPIC_ANGLES = [
-    "major artificial intelligence breakthroughs this week",
-    "the future of global economy and tech stock market",
-    "revolutionary medical technologies saving lives",
-    "cybersecurity alerts and data protection updates",
-    "space exploration and new satellite discoveries",
-    "renewable energy innovations and climate tech"
+    "Latest developments in Generative AI architectures and LLM training costs",
+    "Global semiconductor supply chain shifts and geopolitical impact on tech",
+    "Emerging cybersecurity protocols for protecting decentralized financial data",
+    "Advancements in biotechnology and AI-driven drug discovery efficiency",
+    "Sustainable energy tech: Next-generation battery storage and hydrogen power",
+    "Big Tech antitrust regulations: Europe vs. Silicon Valley's legal landscape"
 ]
 
-def groq_call(prompt, max_tokens=1500):
+def groq_call(system_msg, user_msg, max_tokens=2000):
     for attempt in range(1, 4):
         try:
             completion = client.chat.completions.create(
-                messages=[{"role": "system", "content": "You are an elite news editor. Write high-impact, factual headlines and investigative reports. Use real names. NO future dates."},
-                          {"role": "user", "content": prompt}],
+                messages=[
+                    {"role": "system", "content": system_msg},
+                    {"role": "user", "content": user_msg}
+                ],
                 model="llama-3.1-8b-instant",
-                temperature=0.7,
+                temperature=0.6, # تقليل الحرارة لضمان واقعية أكثر
                 max_tokens=max_tokens,
             )
             return completion.choices[0].message.content
@@ -78,46 +80,56 @@ def groq_call(prompt, max_tokens=1500):
             time.sleep(10)
     return None
 
-def generate_meta(topic, modifier):
-    prompt = f"Topic: {topic}. {modifier}. Generate: [TITLE] (viral headline, max 65 chars), [KEYWORDS] (3 specific words), [META] (compelling summary)."
-    raw = groq_call(prompt, max_tokens=300)
+def generate_meta(topic):
+    system_msg = "You are a professional News SEO strategist. Generate metadata without fluff."
+    user_msg = f"Generate metadata for: {topic}. Output ONLY in this format: [TITLE] (max 65 chars), [KEYWORDS] (3 comma-separated terms), [META] (one compelling sentence)."
     
+    raw = groq_call(system_msg, user_msg, max_tokens=300)
+    if not raw: return None, None, None
+
     t = re.search(r"\[TITLE\]\s*(.*)", raw, re.I)
     k = re.search(r"\[KEYWORDS\]\s*(.*)", raw, re.I)
     m = re.search(r"\[META\]\s*(.*)", raw, re.I)
     
-    title = t.group(1).strip() if t else f"Breaking News: {topic.title()}"
-    keywords = k.group(1).strip() if k else "News, Tech, Future"
-    meta = m.group(1).strip() if m else f"Latest exclusive report on {topic}."
+    title = t.group(1).strip() if t else f"Update: {topic}"
+    keywords = k.group(1).strip() if k else "Tech, News, Innovation"
+    meta = m.group(1).strip() if m else f"Latest analysis on {topic}."
     
     return title, keywords, meta
 
 def generate_article(title, topic):
-    prompt = f"Write a professional 800-word news article about: {title}. Focus on {topic}. Include expert-style analysis. Date: {today_date}. Format with <h2> and <p> only."
-    return groq_call(prompt, max_tokens=2000)
+    system_msg = """You are a Senior Investigative Tech Journalist. 
+    STRICT GUIDELINES:
+    1. FACTUALITY: Do NOT invent features for existing models (e.g., AlphaGo is for Go only). 
+    2. SOURCES: Do NOT invent quotes from real people. Instead, use 'Industry analysts suggest' or 'Recent corporate reports indicate'.
+    3. TONE: Serious, analytical, and objective. No 'mind-blowing' or 'revolutionary' clichés.
+    4. NO HALLUCINATION: If you don't have current data on a specific private event, write a broader industry analysis.
+    5. DATA-DRIVEN: Focus on trends, regulations, and architectural shifts in tech."""
 
-# ✅ نظام الصور المتطور لضمان التنوع والجودة (Viral Quality)
+    user_msg = f"""Write an 800-word authoritative report. 
+    Headline: {title}
+    Focus: {topic}
+    Current Date: {today_date}
+    Format: Use <h2> and <p> tags. Include one <blockquote> with a deep industry insight."""
+    
+    return groq_call(system_msg, user_msg)
+
+# ✅ نظام الصور - تم تحسينه لتجنب "Hoodie Guy" والتركيز على الصور التقنية
 def get_best_pexels_image(keywords, title):
     try:
-        # خلط الكلمات لاستخراج أفضل نتيجة بحث ممكنة
         search_terms = keywords.replace(',', '').split() + title.split()
-        # استبعاد الكلمات القصيرة وغير المفيدة
-        clean_terms = [w for w in search_terms if len(w) > 4]
-        
-        # محاولة البحث بكلمتين عشوائيتين لزيادة الدقة
-        query = " ".join(random.sample(clean_terms, min(2, len(clean_terms)))) if clean_terms else "innovation"
+        # نركز على كلمات تقنية باش الصور يكونو "News-like"
+        clean_terms = [w for w in search_terms if len(w) > 4 and w.lower() not in ["breaking", "news", "update"]]
+        query = random.choice(clean_terms) if clean_terms else "technology"
         
         url = f"https://api.pexels.com/v1/search?query={urllib.parse.quote(query)}&per_page=20"
         res = requests.get(url, headers={"Authorization": PEXELS_KEY}, timeout=10).json()
         
         if res.get("photos"):
-            # اختيار صورة عشوائية من أفضل 20 نتيجة لضمان عدم التكرار
             return random.choice(res["photos"])["src"]["large2x"]
-        
-        raise Exception("No specific photos found")
+        raise Exception("No photos found")
     except:
-        # Fallback احترافي: صور تقنية عالية الجودة متغيرة بناءً على العنوان
-        hash_seed = abs(hash(title)) % 10000
+        hash_seed = abs(hash(title)) % 1000
         return f"https://picsum.photos/seed/{hash_seed}/1200/630"
 
 def build_full_html(title, content, img, meta):
@@ -132,51 +144,43 @@ def build_full_html(title, content, img, meta):
     
     return f"""
     <script type="application/ld+json">{json.dumps(schema)}</script>
-    <div style="font-family: 'Helvetica Neue', Helvetica, Arial, sans-serif; line-height: 1.8; color: #111; max-width: 800px; margin: auto; border: 1px solid #eee; padding: 20px; border-radius: 8px;">
-        <header style="border-bottom: 4px solid #cc0000; padding-bottom: 15px; margin-bottom: 25px;">
-            <h1 style="font-size: 38px; line-height: 1.1; font-weight: bold; letter-spacing: -1px;">{title}</h1>
-            <p style="color: #666; text-transform: uppercase; font-size: 13px; font-weight: bold;">Exclusive Report • {today_date} • By Smart Flow Editor</p>
+    <div style="font-family: 'Georgia', serif; line-height: 1.8; color: #1a1a1a; max-width: 800px; margin: auto; padding: 20px;">
+        <header style="border-bottom: 2px solid #333; padding-bottom: 15px; margin-bottom: 30px;">
+            <h1 style="font-size: 36px; line-height: 1.2; font-weight: bold; margin-bottom: 10px;">{title}</h1>
+            <p style="color: #555; font-size: 14px; font-weight: bold;">SMART FLOW NEWS CORRESPONDENT • {today_date}</p>
         </header>
         
-        <figure style="margin: 0 0 25px 0;">
-            <img src="{img}" alt="{title}" style="width: 100%; height: auto; border-radius: 5px; box-shadow: 0 4px 12px rgba(0,0,0,0.1);">
-            <figcaption style="font-size: 12px; color: #888; margin-top: 8px; text-align: right;">Visual representation of today's top story.</figcaption>
-        </figure>
-
-        <div style="font-size: 19px; color: #333; text-align: justify;">
+        <img src="{img}" alt="{title}" style="width: 100%; height: auto; border-radius: 2px; margin-bottom: 30px;">
+        
+        <div style="font-size: 18px;">
             {content}
         </div>
         
-        <div style="margin-top: 40px; padding: 20px; background: #fdfdfd; border-top: 1px solid #ddd; display: flex; align-items: center;">
-            <div style="width: 60px; height: 60px; background: #cc0000; color: #fff; border-radius: 50%; display: flex; justify-content: center; align-items: center; font-weight: bold; font-size: 24px; margin-right: 15px;">MI</div>
-            <div>
-                <strong style="font-size: 18px;">Mohamed Ismaili</strong><br>
-                <span style="color: #777; font-size: 14px;">Senior Tech Correspondent at Smart Flow Lab.</span>
-            </div>
+        <div style="margin-top: 50px; padding: 25px; background: #f9f9f9; border-left: 4px solid #cc0000;">
+            <strong style="font-size: 20px;">Mohamed Ismaili</strong><br>
+            <span style="color: #666;">Senior Technology Analyst covering AI ethics, semiconductor markets, and digital infrastructure.</span>
         </div>
         
-        <footer style="margin-top: 30px; text-align: center; font-size: 12px; color: #aaa; border-top: 1px dotted #ccc; padding-top: 20px;">
-            © {current_year} Smart Flow Lab News - All Rights Reserved.<br>
-            Source Analysis: {meta}
+        <footer style="margin-top: 40px; text-align: center; font-size: 11px; color: #999; border-top: 1px solid #eee; padding-top: 20px;">
+            © {current_year} Smart Flow Lab. All rights reserved. <br>
+            Metadata Context: {meta}
         </footer>
     </div>
     """
 
 def main():
-    print("🚀 News Engine Active...")
+    print("🚀 Running Professional News Engine...")
     chosen_topic = random.choice(TOPIC_ANGLES)
-    # طلب عنوان بصيغة الخبر العاجل (Breaking)
-    title, keywords, meta = generate_meta(chosen_topic, "Make it sound like a viral breaking news headline")
+    title, keywords, meta = generate_meta(chosen_topic)
     
     if not title: return
-    print(f"📰 Generating Viral Content: {title}")
+    print(f"📰 Drafting: {title}")
     
     content = generate_article(title, chosen_topic)
     if not content: return
     
     img = get_best_pexels_image(keywords, title)
     full_html = build_full_html(title, content, img, meta)
-    
     post_to_blogger_api(title, full_html)
 
 if __name__ == "__main__":
