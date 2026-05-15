@@ -2,6 +2,7 @@ name: Blogger Professional Bot
 
 on:
   schedule:
+    # سيتم تشغيل البوت كل 8 ساعات تلقائياً
     - cron: '0 */8 * * *' 
   workflow_dispatch: 
 
@@ -24,10 +25,13 @@ jobs:
 
       - name: Run Auto Bot
         env:
+          # ربط السيكريت بالمتغيرات التي يطلبها الكود الجديد
           GROQ_API_KEY: ${{ secrets.GROQ_API_KEY }}
           PEXELS_API_KEY: ${{ secrets.PEXELS_API_KEY }}
           BLOGGER_EMAIL: ${{ secrets.BLOGGER_EMAIL }}
-          # التأكد من مطابقة السيكريت مع المتغير اللي في الكود
-          GMAIL_SENDER: ${{ secrets.GMAIL_SENDER }}
-          GMAIL_SENDER_PASS: ${{ secrets.GMAIL_SENDER_PASS }}
+          
+          # لاحظ هنا استعملنا الأسماء الجديدة الموجودة في كود بايثون
+          MY_GMAIL: ${{ secrets.GMAIL_SENDER }}
+          GMAIL_APP_PASSWORD: ${{ secrets.GMAIL_SENDER_PASS }}
+          
         run: python main.py
