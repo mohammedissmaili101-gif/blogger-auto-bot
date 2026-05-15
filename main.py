@@ -1,26 +1,59 @@
 import os
-import smtplib
 import re
 import datetime
 import urllib.parse
 import requests
 import random
 import time
-from email.mime.text import MIMEText
 from groq import Groq
+# المكتبات الجديدة للنشر عبر API
+from google.oauth2.credentials import Credentials
+from googleapiclient.discovery import build
+from google.auth.transport.requests import Request
 
 # ── Secrets ───────────────────────────────────────────────
-GROQ_KEY     = os.environ.get("GROQ_API_KEY")
-GMAIL_PASS   = os.environ.get("GMAIL_APP_PASSWORD")
-BLOGGER_MAIL = os.environ.get("BLOGGER_EMAIL")
-MY_GMAIL     = os.environ.get("MY_GMAIL")
-PEXELS_KEY   = os.environ.get("PEXELS_API_KEY")
+GROQ_KEY      = os.environ.get("GROQ_API_KEY")
+PEXELS_KEY    = os.environ.get("PEXELS_API_KEY")
+# السوارت الجداد
+CLIENT_ID     = os.environ.get("BLOGGER_CLIENT_ID")
+CLIENT_SECRET = os.environ.get("BLOGGER_CLIENT_SECRET")
+REFRESH_TOKEN = os.environ.get("BLOGGER_REFRESH_TOKEN")
 
 client       = Groq(api_key=GROQ_KEY)
 today_date   = datetime.date.today().strftime("%B %d, %Y")
 current_year = datetime.date.today().year
 
-# ── Topic Rotation System ─────────────────────────────────
+# ── Blogger API Setup ─────────────────────────────────────
+def post_to_blogger_api(title, html_content):
+    try:
+        creds = Credentials(
+            None,
+            refresh_token=REFRESH_TOKEN,
+            token_uri="https://oauth2.googleapis.com/token",
+            client_id=CLIENT_ID,
+            client_secret=CLIENT_SECRET,
+        )
+        if not creds.valid:
+            creds.refresh(Request())
+        
+        service = build('blogger', 'v3', credentials=creds)
+        
+        # كيجيب المدونة الأولى في حسابك أوتوماتيكياً
+        blogs = service.blogs().listByUser(userId='self').execute()
+        blog_id = blogs['items'][0]['id']
+
+        body = {
+            "kind": "blogger#post",
+            "title": title,
+            "content": html_content
+        }
+        
+        service.posts().insert(blogId=blog_id, body=body).execute()
+        print(f"✅ Article Published via API: {title}")
+    except Exception as e:
+        print(f"❌ Blogger API Error: {e}")
+
+# ── Topic Rotation System (كما هو) ────────────────────────
 TOPIC_ANGLES = [
     f"the most disruptive NEW AI model released this week in {current_year}",
     f"a BREAKTHROUGH scientific study about productivity using technology in {current_year}",
@@ -76,13 +109,9 @@ def get_best_pexels_image(keywords):
         return res["photos"][0]["src"]["large2x"]
     except: return "https://picsum.photos/1200/630"
 
-# ── Magazine HTML Builder (من الكود القديم لضمان النشر) ──
 def build_full_html(title, content, img, meta):
     return f"""
-    <!DOCTYPE html>
-    <html lang="en">
-    <head><meta charset="UTF-8"></head>
-    <body style="font-family: 'Georgia', serif; line-height: 1.8; color: #1a1a1a; max-width: 800px; margin: auto;">
+    <div style="font-family: 'Georgia', serif; line-height: 1.8; color: #1a1a1a; max-width: 800px; margin: auto;">
         <div style="text-align: center; border-bottom: 2px solid #333; padding: 20px;">
             <h1 style="font-size: 36px; margin-bottom: 10px;">{title}</h1>
             <p style="color: #666;">Smart Flow Lab Exclusive • {today_date}</p>
@@ -93,12 +122,11 @@ def build_full_html(title, content, img, meta):
         <footer style="text-align: center; color: #999; font-size: 12px;">
             © {current_year} Smart Flow Lab. Meta: {meta}
         </footer>
-    </body>
-    </html>
+    </div>
     """
 
 def main():
-    print("🚀 Starting Engine...")
+    print("🚀 Starting Engine (API Mode)...")
     title, keywords, meta = generate_meta()
     if not title: return
     
@@ -109,18 +137,8 @@ def main():
     img = get_best_pexels_image(keywords)
     full_html = build_full_html(title, content, img, meta)
 
-    msg = MIMEText(full_html, 'html', 'utf-8')
-    msg['Subject'] = title
-    msg['From']    = MY_GMAIL
-    msg['To']      = BLOGGER_MAIL
-
-    try:
-        with smtplib.SMTP_SSL('smtp.gmail.com', 465) as server:
-            server.login(MY_GMAIL, GMAIL_PASS)
-            server.send_message(msg)
-        print(f"✅ Article Sent and Published: {title}")
-    except Exception as e:
-        print(f"❌ Error: {e}")
+    # النشر عبر API بدلاً من الإيميل
+    post_to_blogger_api(title, full_html)
 
 if __name__ == "__main__":
     main()
