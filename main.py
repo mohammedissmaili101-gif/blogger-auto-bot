@@ -41,110 +41,75 @@ random_modifier = random.choice([
 
 chosen_topic = random.choice(TOPIC_ANGLES)
 
-# ── Groq Call Helper ──────────────────────────────────────
 def groq_call(prompt, max_tokens=1500):
     for attempt in range(1, 4):
         try:
-            print(f"🤖 Attempt {attempt}/3...")
             completion = client.chat.completions.create(
                 messages=[{"role": "user", "content": prompt}],
-                model="llama-3.1-8b-instant",  # موديل سريع وعنده limit كبير
+                model="llama-3.1-8b-instant",
                 temperature=0.8,
                 max_tokens=max_tokens,
             )
             return completion.choices[0].message.content
         except Exception as e:
-            print(f"❌ Groq Error attempt {attempt}: {e}")
-            time.sleep(15)
+            print(f"❌ Attempt {attempt} failed: {e}")
+            time.sleep(10)
     return None
 
-# ── Call 1: توليد العنوان والـ meta فقط (tokens قليلة) ────
 def generate_meta():
-    prompt = f"""Current Date: {today_date}
-Story: {chosen_topic}
-Angle: {random_modifier}
-
-Generate ONLY these 3 lines, nothing else:
-[TITLE] a punchy unique headline under 65 chars specific to this story
-[KEYWORDS] keyword1, keyword2, keyword3, keyword4
-[META] meta description under 160 chars"""
-
+    prompt = f"Topic: {chosen_topic}\nModifier: {random_modifier}\nGenerate ONLY: [TITLE] (max 65 chars), [KEYWORDS], [META] (max 160 chars)"
     raw = groq_call(prompt, max_tokens=200)
-    if not raw:
-        return None, None, None
+    if not raw: return None, None, None
+    t = re.search(r"\[TITLE\]\s*(.*)", raw, re.I)
+    k = re.search(r"\[KEYWORDS\]\s*(.*)", raw, re.I)
+    m = re.search(r"\[META\]\s*(.*)", raw, re.I)
+    return (t.group(1).strip() if t else "AI Tech Update"), (k.group(1).strip() if k else "AI"), (m.group(1).strip() if m else "")
 
-    title_match = re.search(r"\[TITLE\]\s*(.*)", raw, re.IGNORECASE)
-    kw_match    = re.search(r"\[KEYWORDS\]\s*(.*)", raw, re.IGNORECASE)
-    meta_match  = re.search(r"\[META\]\s*(.*)", raw, re.IGNORECASE)
-
-    title     = re.sub(r'[#*`]', '', title_match.group(1).split('[')[0].strip())[:65] if title_match else f"AI Exclusive {today_date}"
-    keywords  = kw_match.group(1).split('[')[0].strip() if kw_match else "tech, ai, innovation"
-    meta_desc = meta_match.group(1).split('[')[0].strip()[:160] if meta_match else "Deep dive analysis."
-
-    return title, keywords, meta_desc
-
-# ── Call 2: توليد المقال فقط (منفصل) ────────────────────
 def generate_article(title):
-    prompt = f"""Current Date: {today_date}
-Article Title: {title}
-Story: {chosen_topic}
-Angle: {random_modifier}
+    prompt = f"Title: {title}\nTopic: {chosen_topic}\nWrite a long investigative article (800 words). Use ONLY <p>, <h2>, <blockquote>, <strong>. No markdown."
+    return groq_call(prompt, max_tokens=1800)
 
-You are an investigative tech journalist. Write the article body ONLY (700-900 words).
-Use ONLY these HTML tags: <p>, <h2>, <h3>, <strong>, <em>, <blockquote>
-- No markdown, no asterisks, no hashtags
-- Start directly with a <p> hook paragraph
-- Include at least one <blockquote> with an expert quote
-- No title in the content, just the article body"""
-
-    return groq_call(prompt, max_tokens=1500)
-
-# ── Pexels Image ──────────────────────────────────────────
 def get_best_pexels_image(keywords):
-    if not PEXELS_KEY:
-        return "https://picsum.photos/1200/630"
     try:
         url = f"https://api.pexels.com/v1/search?query={urllib.parse.quote(keywords)}&per_page=1"
         res = requests.get(url, headers={"Authorization": PEXELS_KEY}, timeout=10).json()
-        return res["photos"][0]["src"]["large2x"] if res.get("photos") else "https://picsum.photos/1200/630"
-    except:
-        return "https://picsum.photos/1200/630"
+        return res["photos"][0]["src"]["large2x"]
+    except: return "https://picsum.photos/1200/630"
 
-# ── Main ──────────────────────────────────────────────────
-def main():
-    print("🚀 Starting Groq-Powered Bot...")
-    print(f"📌 Topic: {chosen_topic[:80]}")
-    print(f"🎯 Angle: {random_modifier}")
-
-    # Call 1: meta
-    print("📝 Generating meta...")
-    title, keywords, meta_desc = generate_meta()
-    if not title:
-        print("❌ Meta generation failed.")
-        return
-    print(f"📰 Title: {title}")
-
-    # انتظر قليلاً بين الـ calls باش ما تتجاوزش الـ rate limit
-    time.sleep(5)
-
-    # Call 2: article
-    print("✍️  Generating article...")
-    content = generate_article(title)
-    if not content or len(content) < 400:
-        print("❌ Article generation failed or too short.")
-        return
-
-    print("🖼️  Fetching image...")
-    img = get_best_pexels_image(keywords)
-
-    html = f"""
-    <div dir="ltr" style="font-family: Arial; line-height: 1.8; font-size: 18px; color: #333;">
-        <img src="{img}" style="width: 100%; border-radius: 8px;" alt="{title}">
-        <div style="margin-top: 20px;">{content}</div>
-    </div>
+# ── Magazine HTML Builder (من الكود القديم لضمان النشر) ──
+def build_full_html(title, content, img, meta):
+    return f"""
+    <!DOCTYPE html>
+    <html lang="en">
+    <head><meta charset="UTF-8"></head>
+    <body style="font-family: 'Georgia', serif; line-height: 1.8; color: #1a1a1a; max-width: 800px; margin: auto;">
+        <div style="text-align: center; border-bottom: 2px solid #333; padding: 20px;">
+            <h1 style="font-size: 36px; margin-bottom: 10px;">{title}</h1>
+            <p style="color: #666;">Smart Flow Lab Exclusive • {today_date}</p>
+        </div>
+        <img src="{img}" style="width: 100%; border-radius: 8px; margin: 30px 0;">
+        <div style="font-size: 19px;">{content}</div>
+        <hr style="margin: 50px 0; border: 0; border-top: 1px solid #eee;">
+        <footer style="text-align: center; color: #999; font-size: 12px;">
+            © {current_year} Smart Flow Lab. Meta: {meta}
+        </footer>
+    </body>
+    </html>
     """
 
-    msg = MIMEText(html, 'html', 'utf-8')
+def main():
+    print("🚀 Starting Engine...")
+    title, keywords, meta = generate_meta()
+    if not title: return
+    
+    print(f"📰 Generating Content for: {title}")
+    content = generate_article(title)
+    if not content: return
+    
+    img = get_best_pexels_image(keywords)
+    full_html = build_full_html(title, content, img, meta)
+
+    msg = MIMEText(full_html, 'html', 'utf-8')
     msg['Subject'] = title
     msg['From']    = MY_GMAIL
     msg['To']      = BLOGGER_MAIL
@@ -153,9 +118,9 @@ def main():
         with smtplib.SMTP_SSL('smtp.gmail.com', 465) as server:
             server.login(MY_GMAIL, GMAIL_PASS)
             server.send_message(msg)
-        print(f"✅ Published to Blogger: {title}")
+        print(f"✅ Article Sent and Published: {title}")
     except Exception as e:
-        print(f"❌ Email Error: {e}")
+        print(f"❌ Error: {e}")
 
 if __name__ == "__main__":
     main()
