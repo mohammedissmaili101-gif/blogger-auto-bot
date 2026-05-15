@@ -5,8 +5,8 @@ import datetime
 import urllib.parse
 import requests
 import random
-import traceback
-from email.message import EmailMessage
+from email.mime.text import MIMEText
+from email.mime.multipart import MIMEMultipart
 from groq import Groq
 
 # ── Secrets ──────────────────────────────────────────────
@@ -71,7 +71,7 @@ prompt = (
     "your full HTML article here using ONLY <p>, <h2>, <h3>, <strong>, <em>, <blockquote>. No markdown. No code fences.\n"
 )
 
-# ── CSS ───────────────────────────────────────────────────
+# ── CSS stored separately to avoid brace conflicts ───────
 CSS = """
   *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
   :root {
@@ -360,7 +360,7 @@ def generate_content(max_retries=3):
     return None, None, None, None
 
 
-# ── Pexels Image ──────────────────────────────────────────
+# ── Pexels Image (bright, relevant) ──────────────────────
 def get_best_pexels_image(keywords):
     keywords = str(keywords).strip()
     fallback_keywords = [keywords, "technology innovation bright", "artificial intelligence future bright"]
@@ -411,7 +411,7 @@ def get_best_pexels_image(keywords):
     return "https://picsum.photos/seed/" + urllib.parse.quote(keywords, safe="") + "/1200/628"
 
 
-# ── HTML Builder ──────────────────────────────────────────
+# ── Magazine-Quality HTML Builder ────────────────────────
 def build_html(title, meta_desc, image_url, article_body):
     title        = str(title).strip()
     meta_desc    = str(meta_desc).strip()
@@ -473,9 +473,7 @@ def build_html(title, meta_desc, image_url, article_body):
         '</html>',
     ]
 
-    # Safety check: force every item to str before joining
-    safe_parts = [str(p) for p in parts]
-    return '\n'.join(safe_parts)
+    return '\n'.join(parts)
 
 
 # ── Send Email ────────────────────────────────────────────
@@ -483,24 +481,30 @@ def send_email(title, html_body):
     title     = str(title).strip()
     html_body = str(html_body).strip()
 
-    msg = EmailMessage()
+    # Use MIMEMultipart to avoid bytes/str conflict with utf-8 charset
+    msg = MIMEMultipart("alternative")
     msg["Subject"] = title
     msg["From"]    = str(SENDER_GMAIL)
     msg["To"]      = str(BLOGGER_MAIL)
-    msg.set_content("Please enable HTML to view this email.")
-    msg.add_alternative(html_body, subtype="html")
+
+    # Attach HTML part — encode to bytes explicitly, pass as string to MIMEText
+    html_part = MIMEText(html_body.encode("utf-8").decode("utf-8"), "html", "utf-8")
+    msg.attach(html_part)
 
     try:
         with smtplib.SMTP_SSL("smtp.gmail.com", 465, timeout=30) as server:
             server.login(str(SENDER_GMAIL), str(SENDER_PASS))
-            server.send_message(msg)
+            server.sendmail(
+                str(SENDER_GMAIL),
+                str(BLOGGER_MAIL),
+                msg.as_bytes()
+            )
         print("SUCCESS: Published: " + title)
     except smtplib.SMTPAuthenticationError:
         print("ERROR: SMTP Auth failed. Check Gmail App Password.")
     except smtplib.SMTPException as e:
         print("ERROR: SMTP Error: " + str(e))
     except Exception as e:
-        traceback.print_exc()
         print("ERROR: General Error: " + str(e))
 
 
