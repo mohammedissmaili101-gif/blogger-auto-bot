@@ -20,7 +20,7 @@ CLIENT_SECRET = os.environ.get("BLOGGER_CLIENT_SECRET")
 REFRESH_TOKEN = os.environ.get("BLOGGER_REFRESH_TOKEN")
 
 client       = Groq(api_key=GROQ_KEY)
-today_date   = datetime.date.today().strftime("%B %d, %Y")
+today_date   = datetime.date.today().strftime("%B % d, %Y")
 current_year = datetime.date.today().year
 
 # ── Blogger API Setup ─────────────────────────────────────
@@ -45,11 +45,12 @@ def post_to_blogger_api(title, html_content):
         body = {
             "kind": "blogger#post",
             "title": title,
-            "content": html_content
+            "content": html_content,
+            "labels": ["News"]  # تمت إضافة التصنيف المطلوب هنا
         }
         
         service.posts().insert(blogId=blog_id, body=body).execute()
-        print(f"✅ Article Published via API: {title}")
+        print(f"✅ Article Published via API with News Label: {title}")
     except Exception as e:
         print(f"❌ Blogger API Error: {e}")
 
