@@ -1,4 +1,4 @@
-Name: Blogger Professional Bot
+name: Blogger Professional Bot
 
 on:
   schedule:
@@ -27,7 +27,7 @@ jobs:
           GROQ_API_KEY: ${{ secrets.GROQ_API_KEY }}
           PEXELS_API_KEY: ${{ secrets.PEXELS_API_KEY }}
           BLOGGER_EMAIL: ${{ secrets.BLOGGER_EMAIL }}
-          # التصحيح هنا: كنربطو السيكريت بالمتغير اللي كيقلب عليه بايثون
+          # التأكد من مطابقة السيكريت مع المتغير اللي في الكود
           GMAIL_SENDER: ${{ secrets.GMAIL_SENDER }}
           GMAIL_SENDER_PASS: ${{ secrets.GMAIL_SENDER_PASS }}
         run: python main.py
