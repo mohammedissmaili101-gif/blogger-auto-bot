@@ -35,7 +35,7 @@ def post_to_blogger_api(title, html_content):
         )
         if not creds.valid:
             creds.refresh(Request())
-        
+
         service = build('blogger', 'v3', credentials=creds)
         blogs = service.blogs().listByUser(userId='self').execute()
         blog_id = blogs['items'][0]['id']
@@ -46,7 +46,7 @@ def post_to_blogger_api(title, html_content):
             "content": html_content,
             "labels": ["News"]
         }
-        
+
         service.posts().insert(blogId=blog_id, body=body).execute()
         print(f"✅ Article Published: {title}")
     except Exception as e:
@@ -54,13 +54,59 @@ def post_to_blogger_api(title, html_content):
 
 # ── Smart Topics Rotation ────────────────────────
 TOPIC_ANGLES = [
-    "Latest developments in Generative AI architectures and LLM training costs",
-    "Global semiconductor supply chain shifts and geopolitical impact on tech",
-    "Emerging cybersecurity protocols for protecting decentralized financial data",
-    "Advancements in biotechnology and AI-driven drug discovery efficiency",
-    "Sustainable energy tech: Next-generation battery storage and hydrogen power",
-    "Big Tech antitrust regulations: Europe vs. Silicon Valley's legal landscape"
+    {
+        "topic": "Latest developments in Generative AI architectures and LLM training costs",
+        "image_queries": ["artificial intelligence server room", "neural network computing", "data center GPU cluster"]
+    },
+    {
+        "topic": "Global semiconductor supply chain shifts and geopolitical impact on tech",
+        "image_queries": ["semiconductor chip manufacturing", "silicon wafer factory", "microchip production"]
+    },
+    {
+        "topic": "Emerging cybersecurity protocols for protecting decentralized financial data",
+        "image_queries": ["cybersecurity network protection", "blockchain technology digital", "data encryption security"]
+    },
+    {
+        "topic": "Advancements in biotechnology and AI-driven drug discovery efficiency",
+        "image_queries": ["biotechnology laboratory research", "drug discovery microscope", "pharmaceutical AI research"]
+    },
+    {
+        "topic": "Sustainable energy tech: Next-generation battery storage and hydrogen power",
+        "image_queries": ["hydrogen fuel cell technology", "battery storage renewable energy", "sustainable energy grid"]
+    },
+    {
+        "topic": "Big Tech antitrust regulations: Europe vs. Silicon Valley's legal landscape",
+        "image_queries": ["tech regulation government policy", "silicon valley headquarters", "european union technology law"]
+    }
 ]
+
+# ── FIX 1: Markdown → HTML converter ─────────────────────
+def markdown_to_html(text):
+    """Convert any leftover Markdown formatting to proper HTML."""
+    # **bold** → <strong>bold</strong>
+    text = re.sub(r'\*\*(.+?)\*\*', r'<strong>\1</strong>', text)
+    # *italic* → <em>italic</em>
+    text = re.sub(r'\*(.+?)\*', r'<em>\1</em>', text)
+    # Bullet lines starting with * or - → wrap in <ul><li>
+    lines = text.split('\n')
+    html_lines = []
+    in_list = False
+    for line in lines:
+        stripped = line.strip()
+        if re.match(r'^[\*\-]\s+', stripped):
+            item = re.sub(r'^[\*\-]\s+', '', stripped)
+            if not in_list:
+                html_lines.append('<ul style="margin: 15px 0; padding-left: 25px;">')
+                in_list = True
+            html_lines.append(f'<li style="margin-bottom: 8px;">{item}</li>')
+        else:
+            if in_list:
+                html_lines.append('</ul>')
+                in_list = False
+            html_lines.append(line)
+    if in_list:
+        html_lines.append('</ul>')
+    return '\n'.join(html_lines)
 
 def groq_call(system_msg, user_msg, max_tokens=2000):
     for attempt in range(1, 4):
@@ -71,7 +117,7 @@ def groq_call(system_msg, user_msg, max_tokens=2000):
                     {"role": "user", "content": user_msg}
                 ],
                 model="llama-3.1-8b-instant",
-                temperature=0.6, # تقليل الحرارة لضمان واقعية أكثر
+                temperature=0.5,
                 max_tokens=max_tokens,
             )
             return completion.choices[0].message.content
@@ -82,54 +128,86 @@ def groq_call(system_msg, user_msg, max_tokens=2000):
 
 def generate_meta(topic):
     system_msg = "You are a professional News SEO strategist. Generate metadata without fluff."
-    user_msg = f"Generate metadata for: {topic}. Output ONLY in this format: [TITLE] (max 65 chars), [KEYWORDS] (3 comma-separated terms), [META] (one compelling sentence)."
-    
+    user_msg = (
+        f"Generate metadata for: {topic}. "
+        "Output ONLY in this format:\n"
+        "[TITLE] (max 65 chars)\n"
+        "[KEYWORDS] (3 comma-separated terms)\n"
+        "[META] (one compelling sentence)"
+    )
+
     raw = groq_call(system_msg, user_msg, max_tokens=300)
-    if not raw: return None, None, None
+    if not raw:
+        return None, None, None
 
     t = re.search(r"\[TITLE\]\s*(.*)", raw, re.I)
     k = re.search(r"\[KEYWORDS\]\s*(.*)", raw, re.I)
     m = re.search(r"\[META\]\s*(.*)", raw, re.I)
-    
-    title = t.group(1).strip() if t else f"Update: {topic}"
+
+    title    = t.group(1).strip() if t else f"Update: {topic}"
     keywords = k.group(1).strip() if k else "Tech, News, Innovation"
-    meta = m.group(1).strip() if m else f"Latest analysis on {topic}."
-    
+    meta     = m.group(1).strip() if m else f"Latest analysis on {topic}."
+
     return title, keywords, meta
 
+# ── FIX 2: Stronger prompt for pure HTML output ───────────
 def generate_article(title, topic):
-    system_msg = """You are a Senior Investigative Tech Journalist. 
-    STRICT GUIDELINES:
-    1. FACTUALITY: Do NOT invent features for existing models (e.g., AlphaGo is for Go only). 
-    2. SOURCES: Do NOT invent quotes from real people. Instead, use 'Industry analysts suggest' or 'Recent corporate reports indicate'.
-    3. TONE: Serious, analytical, and objective. No 'mind-blowing' or 'revolutionary' clichés.
-    4. NO HALLUCINATION: If you don't have current data on a specific private event, write a broader industry analysis.
-    5. DATA-DRIVEN: Focus on trends, regulations, and architectural shifts in tech."""
+    system_msg = """You are a Senior Investigative Tech Journalist writing for a professional news outlet.
 
-    user_msg = f"""Write an 800-word authoritative report. 
-    Headline: {title}
-    Focus: {topic}
-    Current Date: {today_date}
-    Format: Use <h2> and <p> tags. Include one <blockquote> with a deep industry insight."""
-    
-    return groq_call(system_msg, user_msg)
+STRICT OUTPUT RULES:
+1. Output ONLY valid HTML using <h2>, <p>, <blockquote>, <ul>, <li>, <strong> tags.
+2. NEVER use Markdown syntax like **bold**, *italic*, or bullet lines starting with * or -.
+3. FACTUALITY: Do NOT invent capabilities for real AI systems (e.g., AlphaGo only plays Go).
+4. SOURCES: Do NOT invent quotes from real named individuals. Use:
+   - "Industry analysts suggest..."
+   - "According to recent corporate filings..."
+   - "Researchers at [Institution] have noted..."
+5. TONE: Serious, analytical, objective. No hype words like "revolutionary" or "mind-blowing".
+6. DATA-DRIVEN: Reference real trends, published benchmarks, or regulatory actions where possible.
+7. STRUCTURE: Introduction → 2-3 analysis sections with <h2> → Expert perspective <blockquote> → Conclusion."""
 
-# ✅ نظام الصور - تم تحسينه لتجنب "Hoodie Guy" والتركيز على الصور التقنية
-def get_best_pexels_image(keywords, title):
+    user_msg = (
+        f"Write an 800-word authoritative HTML report.\n"
+        f"Headline: {title}\n"
+        f"Focus: {topic}\n"
+        f"Current Date: {today_date}\n\n"
+        "Remember: pure HTML only, zero Markdown."
+    )
+
+    raw = groq_call(system_msg, user_msg)
+    if not raw:
+        return None
+
+    # FIX 1 applied as safety net even with the stronger prompt
+    return markdown_to_html(raw)
+
+# ── FIX 3: Topic-aware image search ──────────────────────
+def get_best_pexels_image(image_queries):
+    """
+    Uses curated per-topic queries instead of random keywords
+    to ensure the image is contextually relevant.
+    """
     try:
-        search_terms = keywords.replace(',', '').split() + title.split()
-        # نركز على كلمات تقنية باش الصور يكونو "News-like"
-        clean_terms = [w for w in search_terms if len(w) > 4 and w.lower() not in ["breaking", "news", "update"]]
-        query = random.choice(clean_terms) if clean_terms else "technology"
-        
-        url = f"https://api.pexels.com/v1/search?query={urllib.parse.quote(query)}&per_page=20"
-        res = requests.get(url, headers={"Authorization": PEXELS_KEY}, timeout=10).json()
-        
+        query = random.choice(image_queries)
+        url = (
+            f"https://api.pexels.com/v1/search"
+            f"?query={urllib.parse.quote(query)}&per_page=15&orientation=landscape"
+        )
+        res = requests.get(
+            url,
+            headers={"Authorization": PEXELS_KEY},
+            timeout=10
+        ).json()
+
         if res.get("photos"):
-            return random.choice(res["photos"])["src"]["large2x"]
+            # Pick from top 5 for some variety while keeping relevance
+            top_photos = res["photos"][:5]
+            return random.choice(top_photos)["src"]["large2x"]
+
         raise Exception("No photos found")
-    except:
-        hash_seed = abs(hash(title)) % 1000
+    except Exception as e:
+        print(f"⚠️ Pexels error: {e} — using fallback image")
+        hash_seed = abs(hash(query)) % 1000
         return f"https://picsum.photos/seed/{hash_seed}/1200/630"
 
 def build_full_html(title, content, img, meta):
@@ -139,48 +217,74 @@ def build_full_html(title, content, img, meta):
         "headline": title,
         "image": [img],
         "datePublished": today_iso,
-        "author": {"@type": "Person", "name": "Mohamed Ismaili"}
+        "author": {
+            "@type": "Person",
+            # FIX 4: Unified author name + bio everywhere
+            "name": "Mohamed Ismaili",
+            "jobTitle": "Senior Technology Analyst"
+        }
     }
-    
+
     return f"""
-    <script type="application/ld+json">{json.dumps(schema)}</script>
-    <div style="font-family: 'Georgia', serif; line-height: 1.8; color: #1a1a1a; max-width: 800px; margin: auto; padding: 20px;">
-        <header style="border-bottom: 2px solid #333; padding-bottom: 15px; margin-bottom: 30px;">
-            <h1 style="font-size: 36px; line-height: 1.2; font-weight: bold; margin-bottom: 10px;">{title}</h1>
-            <p style="color: #555; font-size: 14px; font-weight: bold;">SMART FLOW NEWS CORRESPONDENT • {today_date}</p>
-        </header>
-        
-        <img src="{img}" alt="{title}" style="width: 100%; height: auto; border-radius: 2px; margin-bottom: 30px;">
-        
-        <div style="font-size: 18px;">
-            {content}
-        </div>
-        
-        <div style="margin-top: 50px; padding: 25px; background: #f9f9f9; border-left: 4px solid #cc0000;">
-            <strong style="font-size: 20px;">Mohamed Ismaili</strong><br>
-            <span style="color: #666;">Senior Technology Analyst covering AI ethics, semiconductor markets, and digital infrastructure.</span>
-        </div>
-        
-        <footer style="margin-top: 40px; text-align: center; font-size: 11px; color: #999; border-top: 1px solid #eee; padding-top: 20px;">
-            © {current_year} Smart Flow Lab. All rights reserved. <br>
-            Metadata Context: {meta}
-        </footer>
+<script type="application/ld+json">{json.dumps(schema, ensure_ascii=False)}</script>
+<div style="font-family: 'Georgia', serif; line-height: 1.8; color: #1a1a1a; max-width: 800px; margin: auto; padding: 20px;">
+
+    <header style="border-bottom: 2px solid #333; padding-bottom: 15px; margin-bottom: 30px;">
+        <h1 style="font-size: 36px; line-height: 1.2; font-weight: bold; margin-bottom: 10px;">{title}</h1>
+        <p style="color: #555; font-size: 14px; font-weight: bold;">
+            SMART FLOW LAB &bull; {today_date} &bull; BY MOHAMED ISMAILI
+        </p>
+    </header>
+
+    <figure style="margin: 0 0 30px 0;">
+        <img src="{img}" alt="{title}" style="width: 100%; height: auto; border-radius: 4px;">
+        <figcaption style="font-size: 12px; color: #888; margin-top: 6px; text-align: center;">
+            Image related to: {title}
+        </figcaption>
+    </figure>
+
+    <div style="font-size: 18px;">
+        {content}
     </div>
-    """
+
+    <div style="margin-top: 50px; padding: 25px; background: #f9f9f9; border-left: 4px solid #cc0000;">
+        <strong style="font-size: 20px;">Mohamed Ismaili</strong><br>
+        <span style="color: #666;">
+            Senior Technology Analyst at Smart Flow Lab — covering AI systems,
+            semiconductor markets, and digital infrastructure policy.
+        </span>
+    </div>
+
+    <footer style="margin-top: 40px; text-align: center; font-size: 11px; color: #999;
+                   border-top: 1px solid #eee; padding-top: 20px;">
+        &copy; {current_year} Smart Flow Lab. All rights reserved.
+    </footer>
+</div>
+"""
 
 def main():
-    print("🚀 Running Professional News Engine...")
-    chosen_topic = random.choice(TOPIC_ANGLES)
-    title, keywords, meta = generate_meta(chosen_topic)
-    
-    if not title: return
+    print("🚀 Running Smart Flow Lab Publisher...")
+
+    # Pick a full topic object (topic + image queries together)
+    chosen = random.choice(TOPIC_ANGLES)
+    topic         = chosen["topic"]
+    image_queries = chosen["image_queries"]
+
+    title, keywords, meta = generate_meta(topic)
+    if not title:
+        print("❌ Could not generate metadata. Stopping.")
+        return
+
     print(f"📰 Drafting: {title}")
-    
-    content = generate_article(title, chosen_topic)
-    if not content: return
-    
-    img = get_best_pexels_image(keywords, title)
+
+    content = generate_article(title, topic)
+    if not content:
+        print("❌ Could not generate article. Stopping.")
+        return
+
+    img      = get_best_pexels_image(image_queries)
     full_html = build_full_html(title, content, img, meta)
+
     post_to_blogger_api(title, full_html)
 
 if __name__ == "__main__":
