@@ -16,7 +16,7 @@ from google.auth.transport.requests import Request
 # ══════════════════════════════════════════════
 GROQ_KEY      = os.environ.get("GROQ_API_KEY")
 PEXELS_KEY    = os.environ.get("PEXELS_API_KEY")
-NEWSAPI_KEY   = os.environ.get("NEWSAPI_KEY")          # 🆕 Add this in your env
+NEWSAPI_KEY   = os.environ.get("NEWSAPI_KEY")
 CLIENT_ID     = os.environ.get("BLOGGER_CLIENT_ID")
 CLIENT_SECRET = os.environ.get("BLOGGER_CLIENT_SECRET")
 REFRESH_TOKEN = os.environ.get("BLOGGER_REFRESH_TOKEN")
@@ -27,7 +27,7 @@ today_date   = datetime.date.today().strftime("%B %d, %Y")
 current_year = datetime.date.today().year
 
 # ══════════════════════════════════════════════
-#  TOPICS — كل موضوع عنده keywords للأخبار الحقيقية
+#  TOPICS
 # ══════════════════════════════════════════════
 TOPIC_ANGLES = [
     {
@@ -59,17 +59,98 @@ TOPIC_ANGLES = [
         "topic": "Big Tech antitrust regulations: Europe vs. Silicon Valley's legal landscape",
         "newsapi_query": "big tech antitrust regulation Europe",
         "image_queries": ["tech regulation government policy", "silicon valley headquarters", "european union technology law"]
-    }
+    },
+    {
+        "topic": "The rise of edge computing and its impact on real-time AI applications",
+        "newsapi_query": "edge computing AI real-time applications",
+        "image_queries": ["edge computing network", "IoT devices smart city", "real-time data processing"]
+    },
+    {
+        "topic": "Quantum computing milestones and the threat to modern encryption standards",
+        "newsapi_query": "quantum computing encryption breakthrough",
+        "image_queries": ["quantum computer laboratory", "quantum processor chip", "quantum computing research"]
+    },
+    {
+        "topic": "Open-source AI models vs proprietary systems: the enterprise dilemma",
+        "newsapi_query": "open source AI models enterprise",
+        "image_queries": ["open source software development", "enterprise AI server", "software collaboration code"]
+    },
+    {
+        "topic": "Digital health transformation: AI diagnostics and remote patient monitoring",
+        "newsapi_query": "AI diagnostics digital health remote monitoring",
+        "image_queries": ["digital health technology", "AI medical diagnosis", "remote patient monitoring device"]
+    },
+    {
+        "topic": "Autonomous vehicles and the regulatory road ahead in 2025",
+        "newsapi_query": "autonomous vehicles regulation 2025",
+        "image_queries": ["self-driving car technology", "autonomous vehicle sensor", "electric vehicle future"]
+    },
+    {
+        "topic": "The economics of cloud computing: hyperscalers and the cost efficiency race",
+        "newsapi_query": "cloud computing hyperscaler cost efficiency",
+        "image_queries": ["cloud computing data center", "hyperscale server farm", "cloud infrastructure network"]
+    },
 ]
 
 # ══════════════════════════════════════════════
-#  🆕 NEWSAPI — جلب أخبار حقيقية
+#  DEDUPLICATION — حفظ المواضيع والعناوين المستخدمة
+# ══════════════════════════════════════════════
+HISTORY_FILE = "published_history.json"
+
+def load_history():
+    """تحميل تاريخ المنشورات من الملف."""
+    if os.path.exists(HISTORY_FILE):
+        try:
+            with open(HISTORY_FILE, "r", encoding="utf-8") as f:
+                return json.load(f)
+        except Exception:
+            pass
+    return {"topics": [], "titles": []}
+
+
+def save_history(history):
+    """حفظ تاريخ المنشورات."""
+    with open(HISTORY_FILE, "w", encoding="utf-8") as f:
+        json.dump(history, f, ensure_ascii=False, indent=2)
+
+
+def get_next_topic(history):
+    """
+    اختيار موضوع لم يُنشر بعد.
+    إذا انتهت كل المواضيع يبدأ دورة جديدة.
+    """
+    used_topics = set(history.get("topics", []))
+    available   = [t for t in TOPIC_ANGLES if t["topic"] not in used_topics]
+
+    # إذا انتهت كل المواضيع — دورة جديدة
+    if not available:
+        print("🔄 All topics used — starting new cycle")
+        history["topics"] = []
+        available = TOPIC_ANGLES
+
+    chosen = random.choice(available)
+    print(f"✅ Selected topic: {chosen['topic']}")
+    return chosen
+
+
+def is_title_duplicate(title, history):
+    """التحقق من أن العنوان لم يُستخدم مسبقاً."""
+    used_titles = [t.lower().strip() for t in history.get("titles", [])]
+    return title.lower().strip() in used_titles
+
+
+def record_published(history, topic, title):
+    """تسجيل الموضوع والعنوان المنشور."""
+    history.setdefault("topics", []).append(topic)
+    history.setdefault("titles", []).append(title)
+    # الاحتفاظ بآخر 100 عنوان فقط
+    history["titles"] = history["titles"][-100:]
+    save_history(history)
+
+# ══════════════════════════════════════════════
+#  NEWSAPI — جلب أخبار حقيقية
 # ══════════════════════════════════════════════
 def fetch_real_news(query, max_articles=5):
-    """
-    جلب أخبار حقيقية من NewsAPI لاستخدامها كأساس للمقال.
-    يرجع قائمة من: title, source, url, description
-    """
     if not NEWSAPI_KEY:
         print("⚠️  NEWSAPI_KEY not set — skipping real news fetch")
         return []
@@ -104,9 +185,6 @@ def fetch_real_news(query, max_articles=5):
 
 
 def format_news_for_prompt(articles):
-    """
-    تحويل الأخبار المجلوبة إلى نص منظم للـ prompt.
-    """
     if not articles:
         return "No recent news available — rely on general knowledge."
 
@@ -121,9 +199,6 @@ def format_news_for_prompt(articles):
 
 
 def build_sources_html(articles):
-    """
-    بناء قسم Sources في نهاية المقال — ضروري لـ Google News E-E-A-T.
-    """
     if not articles:
         return ""
 
@@ -195,10 +270,9 @@ def post_process_html(html):
     return html
 
 # ══════════════════════════════════════════════
-#  🆕 GROQ — نموذج أقوى + retry
+#  GROQ — نموذج أقوى + retry
 # ══════════════════════════════════════════════
 def groq_call(system_msg, user_msg, max_tokens=2500):
-    # 🆕 نموذج 70b بدل 8b — جودة أعلى بكثير
     MODEL = "llama-3.3-70b-versatile"
 
     for attempt in range(1, 4):
@@ -209,7 +283,7 @@ def groq_call(system_msg, user_msg, max_tokens=2500):
                     {"role": "user",   "content": user_msg}
                 ],
                 model=MODEL,
-                temperature=0.45,   # أقل عشوائية = أكثر دقة
+                temperature=0.45,
                 max_tokens=max_tokens,
             )
             return completion.choices[0].message.content
@@ -221,12 +295,19 @@ def groq_call(system_msg, user_msg, max_tokens=2500):
 # ══════════════════════════════════════════════
 #  META GENERATION
 # ══════════════════════════════════════════════
-def generate_meta(topic):
+def generate_meta(topic, used_titles):
+    """
+    توليد metadata مع تمرير العناوين المستخدمة لتجنب التكرار.
+    """
+    used_str = "\n".join(f"- {t}" for t in used_titles[-20:]) if used_titles else "None"
+
     system_msg = "You are a professional News SEO strategist. Generate metadata without fluff."
     user_msg = (
-        f"Generate metadata for: {topic}.\n"
+        f"Generate metadata for: {topic}.\n\n"
+        f"IMPORTANT: These titles have already been used — DO NOT use them or anything similar:\n"
+        f"{used_str}\n\n"
         "Output ONLY in this format:\n"
-        "[TITLE] (max 65 chars, news-style headline)\n"
+        "[TITLE] (max 65 chars, news-style headline, MUST be unique)\n"
         "[KEYWORDS] (3 comma-separated terms)\n"
         "[META] (one compelling sentence under 155 chars)"
     )
@@ -244,10 +325,8 @@ def generate_meta(topic):
     return title, keywords, meta
 
 # ══════════════════════════════════════════════
-#  🆕 ARTICLE GENERATOR — بأخبار حقيقية + هياكل متنوعة
+#  ARTICLE GENERATOR
 # ══════════════════════════════════════════════
-
-# هياكل مختلفة كل مرة — يتجنب الـ spam filter
 ARTICLE_STRUCTURES = [
     "intro <p> → Section 1 <h2>+<p> → Section 2 <h2>+<p> → Key Takeaway <blockquote> → Outlook <h2>+<p> → Conclusion <p>",
     "intro <p> → Background <h2>+<p> → Current Developments <h2>+<p><ul> → Expert View <blockquote> → What's Next <h2>+<p>",
@@ -325,7 +404,7 @@ def get_best_pexels_image(image_queries):
         return f"https://picsum.photos/seed/{hash_seed}/1200/630"
 
 # ══════════════════════════════════════════════
-#  🆕 HTML BUILDER — قسم Sources + Schema محسّن
+#  HTML BUILDER
 # ══════════════════════════════════════════════
 def build_full_html(title, content, img, meta, sources_html, keywords):
     schema = {
@@ -398,7 +477,7 @@ def build_full_html(title, content, img, meta, sources_html, keywords):
         {content}
     </div>
 
-    <!-- 🆕 SOURCES SECTION -->
+    <!-- SOURCES SECTION -->
     {sources_html}
 
     <!-- AUTHOR BIO -->
@@ -448,7 +527,6 @@ def post_to_blogger_api(title, html_content, keywords):
         blogs   = service.blogs().listByUser(userId='self').execute()
         blog_id = blogs['items'][0]['id']
 
-        # 🆕 labels من الـ keywords الحقيقية
         label_list = [k.strip() for k in keywords.split(',')][:3]
         label_list.append("News")
 
@@ -463,47 +541,65 @@ def post_to_blogger_api(title, html_content, keywords):
         print(f"✅ Published: {title}")
     except Exception as e:
         print(f"❌ Blogger API Error: {e}")
+        raise  # re-raise حتى لا يُسجَّل كمنشور ناجح
 
 # ══════════════════════════════════════════════
 #  MAIN
 # ══════════════════════════════════════════════
 def main():
-    print("🚀 Smart Flow Lab Publisher v2 — starting...")
+    print("🚀 Smart Flow Lab Publisher v3 — starting...")
 
-    # 1. اختيار الموضوع
-    chosen        = random.choice(TOPIC_ANGLES)
+    # 1. تحميل تاريخ المنشورات
+    history = load_history()
+    print(f"📋 Published so far: {len(history.get('topics', []))} topics, {len(history.get('titles', []))} titles")
+
+    # 2. اختيار موضوع غير مكرر
+    chosen        = get_next_topic(history)
     topic         = chosen["topic"]
     image_queries = chosen["image_queries"]
     newsapi_query = chosen["newsapi_query"]
 
-    # 2. جلب أخبار حقيقية
+    # 3. جلب أخبار حقيقية
     print(f"📡 Fetching real news for: {newsapi_query}")
-    articles      = fetch_real_news(newsapi_query, max_articles=5)
-    news_context  = format_news_for_prompt(articles)
-    sources_html  = build_sources_html(articles)
+    articles     = fetch_real_news(newsapi_query, max_articles=5)
+    news_context = format_news_for_prompt(articles)
+    sources_html = build_sources_html(articles)
 
-    # 3. توليد الـ metadata
-    title, keywords, meta = generate_meta(topic)
+    # 4. توليد metadata مع تمرير العناوين المستخدمة
+    title, keywords, meta = generate_meta(topic, history.get("titles", []))
     if not title:
         print("❌ Metadata generation failed. Stopping.")
         return
+
+    # 5. التحقق من عدم تكرار العنوان — retry مرة واحدة إذا مكرر
+    if is_title_duplicate(title, history):
+        print(f"⚠️ Duplicate title detected: '{title}' — regenerating...")
+        title, keywords, meta = generate_meta(topic, history.get("titles", []))
+        if not title or is_title_duplicate(title, history):
+            print("❌ Could not generate unique title. Stopping.")
+            return
+
     print(f"📰 Title: {title}")
 
-    # 4. توليد المقال بأخبار حقيقية
+    # 6. توليد المقال
     content = generate_article(title, topic, news_context)
     if not content:
         print("❌ Article generation failed. Stopping.")
         return
 
-    # 5. الصورة
+    # 7. الصورة
     img = get_best_pexels_image(image_queries)
 
-    # 6. بناء HTML الكامل
+    # 8. بناء HTML الكامل
     full_html = build_full_html(title, content, img, meta, sources_html, keywords)
 
-    # 7. النشر
-    post_to_blogger_api(title, full_html, keywords)
-    print("🎉 Done!")
+    # 9. النشر — نسجّل فقط إذا نجح النشر
+    try:
+        post_to_blogger_api(title, full_html, keywords)
+        record_published(history, topic, title)
+        print("🎉 Done! History updated.")
+    except Exception as e:
+        print(f"❌ Publish failed — history NOT updated: {e}")
 
 
 if __name__ == "__main__":
