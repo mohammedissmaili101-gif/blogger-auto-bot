@@ -13,15 +13,6 @@ jobs:
       - name: Checkout Code
         uses: actions/checkout@v3
 
-      # ─── استرجاع تاريخ المنشورات من الـ Cache ───
-      - name: Restore published history
-        uses: actions/cache@v3
-        with:
-          path: published_history.json
-          key: published-history-${{ github.run_id }}
-          restore-keys: |
-            published-history-
-
       - name: Setup Python
         uses: actions/setup-python@v4
         with:
@@ -41,11 +32,3 @@ jobs:
           BLOGGER_CLIENT_SECRET: ${{ secrets.BLOGGER_CLIENT_SECRET }}
           BLOGGER_REFRESH_TOKEN: ${{ secrets.BLOGGER_REFRESH_TOKEN }}
         run: python main.py
-
-      # ─── حفظ تاريخ المنشورات بعد كل run ───
-      - name: Save published history
-        if: always()
-        uses: actions/cache@v3
-        with:
-          path: published_history.json
-          key: published-history-${{ github.run_id }}
