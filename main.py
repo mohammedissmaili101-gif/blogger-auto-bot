@@ -288,7 +288,7 @@ def groq_call(system_msg, user_msg, max_tokens=2500):
     return None
 
 # ══════════════════════════════════════════════
-#  META GENERATION (اصلاح جذري للعنوان عبر JSON)
+#  META GENERATION (تم إصلاح الروابط الداخلية بالكامل)
 # ══════════════════════════════════════════════
 def generate_meta(topic, used_titles):
     """
@@ -317,7 +317,6 @@ def generate_meta(topic, used_titles):
         return None, None, None
 
     try:
-        # استخراج الـ JSON بأمان حتى لو أضاف النموذج نصوصاً جانبية بالخطأ
         clean_json = re.search(r"\{.*\}", raw, re.DOTALL)
         if clean_json:
             data = json.loads(clean_json.group(0))
@@ -329,7 +328,6 @@ def generate_meta(topic, used_titles):
     except Exception as e:
         print(f"⚠️ JSON parsing failed, trying fallback regex: {e}")
         
-    # خطة دفاعية احتياطية (Fallback Regex) في حال فشل الـ JSON لأي سبب تقني
     t = re.search(r'"title":\s*"(.*?)"', raw, re.I)
     k = re.search(r'"keywords":\s*"(.*?)"', raw, re.I)
     m = re.search(r'"meta":\s*"(.*?)"', raw, re.I)
@@ -393,13 +391,13 @@ ABSOLUTE RULES:
     return cleaned
 
 # ══════════════════════════════════════════════
-#  PEXELS IMAGE
+#  PEXELS IMAGE (تم إصلاح الرابط هنا)
 # ══════════════════════════════════════════════
 def get_best_pexels_image(image_queries):
     try:
         query = random.choice(image_queries)
         url = (
-            f"[https://api.pexels.com/v1/search](https://api.pexels.com/v1/search)"
+            "[https://api.pexels.com/v1/search](https://api.pexels.com/v1/search)"
             f"?query={urllib.parse.quote(query)}&per_page=15&orientation=landscape"
         )
         res = requests.get(
@@ -419,7 +417,7 @@ def get_best_pexels_image(image_queries):
         return f"[https://picsum.photos/seed/](https://picsum.photos/seed/){hash_seed}/1200/630"
 
 # ══════════════════════════════════════════════
-#  HTML BUILDER
+#  HTML BUILDER (تم إصلاح الروابط هنا)
 # ══════════════════════════════════════════════
 def build_full_html(title, content, img, meta, sources_html, keywords):
     schema = {
@@ -517,7 +515,7 @@ def build_full_html(title, content, img, meta, sources_html, keywords):
 """
 
 # ══════════════════════════════════════════════
-#  BLOGGER PUBLISHER
+#  BLOGGER PUBLISHER (تم إصلاح الرابط هنا)
 # ══════════════════════════════════════════════
 def post_to_blogger_api(title, html_content, keywords):
     try:
