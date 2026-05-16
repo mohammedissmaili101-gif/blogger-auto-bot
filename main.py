@@ -27,133 +27,388 @@ today_date   = datetime.date.today().strftime("%B %d, %Y")
 current_year = datetime.date.today().year
 
 # ══════════════════════════════════════════════
-#  TOPICS
+#  TECH DOMAINS — للتنويع في جلب الأخبار
 # ══════════════════════════════════════════════
-TOPIC_ANGLES = [
-    {
-        "topic": "Latest developments in Generative AI architectures and LLM training costs",
-        "newsapi_query": "generative AI LLM training",
-        "image_queries": ["artificial intelligence server room", "neural network computing", "data center GPU cluster"]
-    },
-    {
-        "topic": "Global semiconductor supply chain shifts and geopolitical impact on tech",
-        "newsapi_query": "semiconductor supply chain geopolitics",
-        "image_queries": ["semiconductor chip manufacturing", "silicon wafer factory", "microchip production"]
-    },
-    {
-        "topic": "Emerging cybersecurity protocols for protecting decentralized financial data",
-        "newsapi_query": "cybersecurity blockchain financial data",
-        "image_queries": ["cybersecurity network protection", "blockchain technology digital", "data encryption security"]
-    },
-    {
-        "topic": "Advancements in biotechnology and AI-driven drug discovery efficiency",
-        "newsapi_query": "AI drug discovery biotechnology 2025",
-        "image_queries": ["biotechnology laboratory research", "drug discovery microscope", "pharmaceutical AI research"]
-    },
-    {
-        "topic": "Sustainable energy tech: Next-generation battery storage and hydrogen power",
-        "newsapi_query": "battery storage hydrogen energy technology",
-        "image_queries": ["hydrogen fuel cell technology", "battery storage renewable energy", "sustainable energy grid"]
-    },
-    {
-        "topic": "Big Tech antitrust regulations: Europe vs. Silicon Valley's legal landscape",
-        "newsapi_query": "big tech antitrust regulation Europe",
-        "image_queries": ["tech regulation government policy", "silicon valley headquarters", "european union technology law"]
-    },
-    {
-        "topic": "The rise of edge computing and its impact on real-time AI applications",
-        "newsapi_query": "edge computing AI real-time applications",
-        "image_queries": ["edge computing network", "IoT devices smart city", "real-time data processing"]
-    },
-    {
-        "topic": "Quantum computing milestones and the threat to modern encryption standards",
-        "newsapi_query": "quantum computing encryption breakthrough",
-        "image_queries": ["quantum computer laboratory", "quantum processor chip", "quantum computing research"]
-    },
-    {
-        "topic": "Open-source AI models vs proprietary systems: the enterprise dilemma",
-        "newsapi_query": "open source AI models enterprise",
-        "image_queries": ["open source software development", "enterprise AI server", "software collaboration code"]
-    },
-    {
-        "topic": "Digital health transformation: AI diagnostics and remote patient monitoring",
-        "newsapi_query": "AI diagnostics digital health remote monitoring",
-        "image_queries": ["digital health technology", "AI medical diagnosis", "remote patient monitoring device"]
-    },
-    {
-        "topic": "Autonomous vehicles and the regulatory road ahead in 2025",
-        "newsapi_query": "autonomous vehicles regulation 2025",
-        "image_queries": ["self-driving car technology", "autonomous vehicle sensor", "electric vehicle future"]
-    },
-    {
-        "topic": "The economics of cloud computing: hyperscalers and the cost efficiency race",
-        "newsapi_query": "cloud computing hyperscaler cost efficiency",
-        "image_queries": ["cloud computing data center", "hyperscale server farm", "cloud infrastructure network"]
-    },
+TECH_DOMAINS = [
+    # AI & Machine Learning
+    ("artificial intelligence breakthrough", "AI technology futuristic"),
+    ("large language model AI", "neural network server"),
+    ("AI regulation policy", "government technology policy"),
+    ("machine learning enterprise", "enterprise AI data center"),
+    ("generative AI tools", "AI creative technology"),
+    # Semiconductors & Hardware
+    ("semiconductor chip manufacturing", "silicon wafer factory"),
+    ("GPU computing nvidia", "graphics processor technology"),
+    ("chip shortage supply chain", "microchip supply chain"),
+    ("RISC-V open hardware", "computer processor chip"),
+    # Cybersecurity
+    ("cybersecurity data breach", "cybersecurity network"),
+    ("ransomware attack infrastructure", "hacker dark cyber"),
+    ("zero trust security", "network security firewall"),
+    ("quantum cryptography security", "encryption data protection"),
+    # Cloud & Infrastructure
+    ("cloud computing AWS Azure Google", "cloud data center"),
+    ("edge computing IoT", "edge computing network"),
+    ("data center energy consumption", "server farm energy"),
+    ("serverless computing platform", "cloud infrastructure"),
+    # Biotech & Health
+    ("AI drug discovery", "laboratory research biotech"),
+    ("digital health wearable", "health technology device"),
+    ("CRISPR gene editing", "DNA laboratory science"),
+    ("telemedicine remote healthcare", "doctor digital health"),
+    # Energy & Climate
+    ("battery storage renewable energy", "solar battery storage"),
+    ("hydrogen fuel cell", "hydrogen energy plant"),
+    ("nuclear fusion energy", "nuclear reactor energy"),
+    ("carbon capture technology", "climate tech green"),
+    # Finance & Fintech
+    ("fintech digital payment", "mobile payment technology"),
+    ("central bank digital currency", "digital currency blockchain"),
+    ("open banking API", "banking technology fintech"),
+    ("crypto regulation", "blockchain cryptocurrency"),
+    # Space & Robotics
+    ("space technology satellite", "rocket launch space"),
+    ("robotics automation factory", "industrial robot arm"),
+    ("drone delivery logistics", "drone technology aerial"),
+    ("autonomous vehicle self-driving", "self-driving car sensor"),
+    # Regulation & Policy
+    ("big tech antitrust regulation", "government tech regulation"),
+    ("data privacy GDPR", "data privacy law"),
+    ("AI ethics regulation", "AI policy ethics"),
+    ("digital trade policy", "international tech policy"),
+    # Quantum & Emerging
+    ("quantum computing breakthrough", "quantum computer lab"),
+    ("augmented reality enterprise", "AR VR headset technology"),
+    ("6G wireless network", "telecommunications network"),
+    ("neuromorphic computing brain", "brain computer interface"),
 ]
 
-# ══════════════════════════════════════════════
-#  DEDUPLICATION — حفظ المواضيع والعناوين المستخدمة
-# ══════════════════════════════════════════════
-HISTORY_FILE = "published_history.json"
 
-def load_history():
-    """تحميل تاريخ المنشورات من الملف."""
-    if os.path.exists(HISTORY_FILE):
+# ══════════════════════════════════════════════
+#  AI TOPIC GENERATOR — يولّد موضوعاً فريداً بالـ AI
+# ══════════════════════════════════════════════
+def generate_topic_from_news(used_titles, raw_articles):
+    """
+    يولّد موضوعاً + newsapi_query + image_queries
+    بناءً على الأخبار الحقيقية والعناوين المستخدمة.
+    """
+    used_str = "\n".join(f"- {t}" for t in used_titles[-30:]) if used_titles else "None"
+    news_str = "\n".join(
+        f"- {a['title']} ({a['source']})" for a in raw_articles
+    ) if raw_articles else "No headlines available"
+
+    system_msg = (
+        "You are an editorial director at a major technology publication. "
+        "Your job is to identify the most newsworthy, unique technology angle "
+        "worth covering today based on real headlines."
+    )
+    user_msg = (
+        f"Today's real technology headlines:\n{news_str}\n\n"
+        f"Already published topics (DO NOT repeat or closely paraphrase):\n{used_str}\n\n"
+        "Based on the headlines above, identify ONE specific, compelling technology topic "
+        "that is:\n"
+        "1. Grounded in the real news provided\n"
+        "2. NOT similar to any already-published topic\n"
+        "3. Has enough depth for a 1200-word analytical article\n"
+        "4. Interesting to tech executives, engineers, and policy professionals\n\n"
+        "Output ONLY in this exact JSON format (no extra text, no markdown):\n"
+        '{\n'
+        '  "topic": "specific descriptive topic sentence (15-25 words)",\n'
+        '  "newsapi_query": "3-5 word search query for NewsAPI",\n'
+        '  "image_query": "3-4 word Pexels image search query"\n'
+        '}'
+    )
+
+    raw = groq_call(system_msg, user_msg, max_tokens=300)
+    if not raw:
+        return None
+
+    try:
+        # تنظيف الـ JSON
+        clean = re.sub(r'```json|```', '', raw).strip()
+        data  = json.loads(clean)
+        return {
+            "topic":         data.get("topic", ""),
+            "newsapi_query": data.get("newsapi_query", "technology innovation"),
+            "image_queries": [data.get("image_query", "technology innovation")],
+        }
+    except Exception as e:
+        print(f"⚠️ Topic JSON parse error: {e} | raw: {raw[:200]}")
+        return None
+
+# ══════════════════════════════════════════════
+#  DEDUPLICATION — جلب العناوين مباشرة من Blogger API
+# ══════════════════════════════════════════════
+
+def get_published_titles_from_blogger():
+    """
+    جلب كل عناوين المقالات المنشورة مباشرة من Blogger API.
+    لا يحتاج أي ملف محلي — المصدر الحقيقي هو Blogger نفسه.
+    """
+    try:
+        creds = Credentials(
+            None,
+            refresh_token=REFRESH_TOKEN,
+            token_uri="https://oauth2.googleapis.com/token",
+            client_id=CLIENT_ID,
+            client_secret=CLIENT_SECRET,
+        )
+        if not creds.valid:
+            creds.refresh(Request())
+
+        service = build('blogger', 'v3', credentials=creds)
+        blogs   = service.blogs().listByUser(userId='self').execute()
+        blog_id = blogs['items'][0]['id']
+
+        titles     = []
+        page_token = None
+
+        while True:
+            params = {
+                "blogId":    blog_id,
+                "maxResults": 500,
+                "fields":    "items(title),nextPageToken",
+                "status":    "live",
+            }
+            if page_token:
+                params["pageToken"] = page_token
+
+            result     = service.posts().list(**params).execute()
+            items      = result.get("items", [])
+            titles    += [p["title"].strip() for p in items if "title" in p]
+            page_token = result.get("nextPageToken")
+
+            if not page_token:
+                break
+
+        print(f"📚 Fetched {len(titles)} existing post titles from Blogger")
+        return titles
+
+    except Exception as e:
+        print(f"⚠️ Could not fetch titles from Blogger: {e}")
+        return []
+
+
+def fetch_trending_headlines():
+    """جلب عناوين من عدة مجالات تقنية للتنويع."""
+    if not NEWSAPI_KEY:
+        return []
+
+    # اختيار 3 domains عشوائية لتنويع الأخبار
+    domains = random.sample(TECH_DOMAINS, min(3, len(TECH_DOMAINS)))
+    all_articles = []
+
+    for query, _ in domains:
         try:
-            with open(HISTORY_FILE, "r", encoding="utf-8") as f:
-                return json.load(f)
+            url = (
+                "https://newsapi.org/v2/everything"
+                f"?q={urllib.parse.quote(query)}"
+                f"&language=en&sortBy=publishedAt&pageSize=5"
+                f"&apiKey={NEWSAPI_KEY}"
+            )
+            res = requests.get(url, timeout=8).json()
+            for a in res.get("articles", []):
+                if a.get("title") and a.get("description"):
+                    all_articles.append({
+                        "title":       a["title"],
+                        "source":      a.get("source", {}).get("name", "Unknown"),
+                        "url":         a.get("url", ""),
+                        "description": a.get("description", ""),
+                        "published":   a.get("publishedAt", "")[:10],
+                    })
         except Exception:
-            pass
-    return {"topics": [], "titles": []}
+            continue
+
+    print(f"📡 Fetched {len(all_articles)} trending headlines across domains")
+    return all_articles
 
 
-def save_history(history):
-    """حفظ تاريخ المنشورات."""
-    with open(HISTORY_FILE, "w", encoding="utf-8") as f:
-        json.dump(history, f, ensure_ascii=False, indent=2)
-
-
-def get_next_topic(history):
+def get_next_topic(used_titles):
     """
-    اختيار موضوع لم يُنشر بعد.
-    إذا انتهت كل المواضيع يبدأ دورة جديدة.
+    يولّد موضوعاً فريداً بالـ AI بناءً على أخبار اليوم الحقيقية.
+    لا قائمة ثابتة — المواضيع لا نهائية.
     """
-    used_topics = set(history.get("topics", []))
-    available   = [t for t in TOPIC_ANGLES if t["topic"] not in used_topics]
+    # جلب أخبار متنوعة من عدة مجالات
+    trending = fetch_trending_headlines()
 
-    # إذا انتهت كل المواضيع — دورة جديدة
-    if not available:
-        print("🔄 All topics used — starting new cycle")
-        history["topics"] = []
-        available = TOPIC_ANGLES
+    # محاولة توليد موضوع فريد — حتى 3 محاولات
+    for attempt in range(1, 4):
+        chosen = generate_topic_from_news(used_titles, trending)
+        if chosen and chosen.get("topic"):
+            print(f"✅ AI-generated topic (attempt {attempt}): {chosen['topic']}")
+            # إضافة image_queries متعددة من TECH_DOMAINS كـ fallback
+            if len(chosen["image_queries"]) < 2:
+                extra = [img for _, img in random.sample(TECH_DOMAINS, 2)]
+                chosen["image_queries"] += extra
+            return chosen
+        print(f"⚠️ Topic generation attempt {attempt} failed, retrying...")
+        time.sleep(5)
 
-    chosen = random.choice(available)
-    print(f"✅ Selected topic: {chosen['topic']}")
-    return chosen
+    # Fallback: اختيار domain عشوائي إذا فشل التوليد
+    print("⚠️ AI topic generation failed — using domain fallback")
+    query, img = random.choice(TECH_DOMAINS)
+    return {
+        "topic":         f"Recent developments in {query}",
+        "newsapi_query": query,
+        "image_queries": [img],
+    }
 
 
-def is_title_duplicate(title, history):
+def is_title_duplicate(title, used_titles):
     """التحقق من أن العنوان لم يُستخدم مسبقاً."""
-    used_titles = [t.lower().strip() for t in history.get("titles", [])]
-    return title.lower().strip() in used_titles
-
-
-def record_published(history, topic, title):
-    """تسجيل الموضوع والعنوان المنشور."""
-    history.setdefault("topics", []).append(topic)
-    history.setdefault("titles", []).append(title)
-    # الاحتفاظ بآخر 100 عنوان فقط
-    history["titles"] = history["titles"][-100:]
-    save_history(history)
+    used_lower = [t.lower().strip() for t in used_titles]
+    return title.lower().strip() in used_lower
 
 # ══════════════════════════════════════════════
-#  NEWSAPI — جلب أخبار حقيقية
+#  NEWSAPI — جلب أخبار حقيقية مع فلتر متعدد المراحل
 # ══════════════════════════════════════════════
-def fetch_real_news(query, max_articles=5):
+
+# مصادر موثوقة في التقنية — الأولوية لها
+TRUSTED_TECH_SOURCES = {
+    "techcrunch", "wired", "the verge", "ars technica", "mit technology review",
+    "ieee spectrum", "zdnet", "cnet", "venturebeat", "engadget", "gizmodo",
+    "computerweekly", "computerworld", "infoworld", "networkworld",
+    "siliconangle", "the information", "protocol", "axios", "reuters",
+    "bloomberg", "financial times", "wall street journal", "forbes",
+    "businessinsider", "cnbc", "bbc technology", "guardian technology",
+    "decrypt", "coindesk", "cointelegraph", "techmonitor", "theregister",
+    "pcmag", "tomshardware", "anandtech", "extremetech", "digitaltrends",
+    "techradar", "macrumors", "9to5mac", "macdailynews", "arstechnica",
+    "slashdot", "hackernews", "nature", "science", "newscientist",
+    "thenextweb", "techmeme", "glassalmanac", "semafor", "platformer"
+}
+
+# مصادر وموضوعات يجب حذفها تماماً
+BLOCKED_SOURCES = {
+    "timeout", "time out", "road.cc", "cyclingnews", "velonews",
+    "triathlete", "runnersworld", "menshealth", "womenshealth",
+    "cosmopolitan", "vogue", "elle", "glamour", "allure",
+    "foodnetwork", "epicurious", "bonappetit", "seriouseats",
+    "espn", "bleacherreport", "sportingnews", "skysports",
+    "tmz", "perezhilton", "people", "usmagazine", "eonline",
+    "tripadvisor", "lonelyplanet", "travelandleisure",
+    "horoscope", "astrology", "tarot",
+}
+
+BLOCKED_CONTENT_SIGNALS = [
+    # رياضة غير تقنية
+    "cycling saddle", "bum massage", "bike seat", "running shoe",
+    "football match", "soccer game", "nba game", "nfl game",
+    "tennis tournament", "golf tournament",
+    # طعام وطبخ
+    "recipe", "cooking", "baking", "restaurant review", "chef",
+    "food festival", "wine tasting",
+    # موضة وجمال
+    "fashion week", "runway show", "makeup tutorial", "skincare",
+    "celebrity style", "red carpet",
+    # ترفيه وفن
+    "box office", "movie review", "album review", "music video",
+    "celebrity gossip", "reality show", "award show",
+    # سفر
+    "travel guide", "hotel review", "vacation", "tourist",
+    # مالية غير ذات صلة
+    "gold treasury", "gold coins", "forex trading", "real estate listing",
+    "mortgage rate", "insurance policy",
+    # قانوني غير ذات صلة  
+    "arbitration case", "divorce", "personal injury",
+    # متفرقات
+    "horoscope", "astrology", "lottery", "gambling casino",
+    "weight loss", "diet plan", "fitness routine",
+]
+
+# كلمات تقنية جوهرية — وجود أي منها يرفع احتمال القبول
+CORE_TECH_SIGNALS = [
+    "ai", "artificial intelligence", "machine learning", "deep learning",
+    "chip", "semiconductor", "processor", "gpu", "cpu", "hardware",
+    "software", "algorithm", "model", "neural", "data", "cloud",
+    "cybersecurity", "encryption", "quantum", "blockchain", "crypto",
+    "startup", "venture", "funding", "acquisition", "ipo",
+    "regulation", "policy", "law", "court", "antitrust",
+    "energy", "battery", "hydrogen", "renewable", "carbon",
+    "biotech", "pharmaceutical", "drug", "clinical", "genomics",
+    "robot", "autonomous", "drone", "satellite", "space",
+    "network", "5g", "6g", "fiber", "bandwidth", "latency",
+    "research", "study", "paper", "breakthrough", "discovery",
+]
+
+
+def _relevance_score(article, query_keywords, topic=""):
+    """
+    يحسب نقاط الصلة للمقال — نظام نقاط بدل True/False.
+    يرجع رقم من 0 إلى 10.
+    """
+    title = article.get("title", "").lower()
+    desc  = article.get("description", "").lower()
+    text  = title + " " + desc
+    source = article.get("source", "").lower()
+
+    score = 0
+
+    # +3 إذا المصدر موثوق تقنياً
+    if any(ts in source for ts in TRUSTED_TECH_SOURCES):
+        score += 3
+
+    # كلمات الـ query
+    stop = {"the", "and", "for", "with", "this", "that", "from", "have",
+            "will", "are", "its", "has", "been", "into", "more", "also",
+            "their", "they", "about", "which", "when", "where", "what"}
+    q_words = [w for w in re.split(r"[\s\-]+", query_keywords.lower())
+               if len(w) > 3 and w not in stop]
+
+    # +1 لكل كلمة query في العنوان (وزن مضاعف)
+    title_matches = sum(1 for w in q_words if w in title)
+    score += title_matches * 2
+
+    # +1 لكل كلمة query في الوصف
+    desc_matches = sum(1 for w in q_words if w in desc)
+    score += desc_matches
+
+    # +1 لكل إشارة تقنية جوهرية
+    tech_hits = sum(1 for sig in CORE_TECH_SIGNALS if sig in text)
+    score += min(tech_hits, 3)  # حد أقصى 3 نقاط من هنا
+
+    # topic إضافي
+    if topic:
+        t_words = [w for w in re.split(r"[\s\-]+", topic.lower())
+                   if len(w) > 4 and w not in stop]
+        topic_matches = sum(1 for w in t_words if w in text)
+        score += min(topic_matches, 2)
+
+    return score
+
+
+def _is_blocked(article):
+    """
+    يتحقق إذا المقال يجب حذفه بسبب المصدر أو المحتوى.
+    """
+    title  = article.get("title", "").lower()
+    desc   = article.get("description", "").lower()
+    source = article.get("source", "").lower()
+    text   = title + " " + desc
+
+    # حذف إذا المصدر في القائمة السوداء
+    if any(bs in source for bs in BLOCKED_SOURCES):
+        return True
+
+    # حذف إذا المحتوى يحتوي على إشارة محجوبة
+    if any(sig in text for sig in BLOCKED_CONTENT_SIGNALS):
+        return True
+
+    return False
+
+
+def fetch_real_news(query, topic="", max_articles=7):
+    """
+    جلب أخبار حقيقية مع فلتر متعدد المراحل:
+    1. حذف المصادر والمحتوى المحجوب
+    2. تسجيل نقاط الصلة لكل مقال
+    3. ترتيب حسب النقاط وأخذ الأفضل
+    """
     if not NEWSAPI_KEY:
         print("⚠️  NEWSAPI_KEY not set — skipping real news fetch")
         return []
+
+    fetch_size = max_articles * 4  # نجلب 4× للتعويض عن الفلترة
 
     try:
         url = (
@@ -161,23 +416,49 @@ def fetch_real_news(query, max_articles=5):
             f"?q={urllib.parse.quote(query)}"
             f"&language=en"
             f"&sortBy=publishedAt"
-            f"&pageSize={max_articles}"
+            f"&pageSize={min(fetch_size, 40)}"
             f"&apiKey={NEWSAPI_KEY}"
         )
         res = requests.get(url, timeout=10).json()
 
-        articles = []
+        raw_articles = []
         for a in res.get("articles", []):
             if a.get("title") and a.get("description"):
-                articles.append({
+                raw_articles.append({
                     "title":       a["title"],
                     "source":      a.get("source", {}).get("name", "Unknown"),
                     "url":         a.get("url", ""),
                     "description": a.get("description", ""),
-                    "published":   a.get("publishedAt", "")[:10]
+                    "published":   a.get("publishedAt", "")[:10],
                 })
-        print(f"📡 Fetched {len(articles)} real news articles for: {query}")
-        return articles
+
+        # ── المرحلة 1: حذف المحجوب ──
+        not_blocked = [a for a in raw_articles if not _is_blocked(a)]
+
+        # ── المرحلة 2: تسجيل نقاط الصلة ──
+        scored = []
+        for a in not_blocked:
+            s = _relevance_score(a, query, topic)
+            if s >= 2:  # حد أدنى للقبول
+                scored.append((s, a))
+
+        # ── المرحلة 3: ترتيب حسب النقاط ──
+        scored.sort(key=lambda x: x[0], reverse=True)
+        result = [a for _, a in scored[:max_articles]]
+
+        # ── Fallback: إذا ما بقاش شي كافي ──
+        if len(result) < 3:
+            print("⚠️ Strict filter too aggressive — relaxing threshold")
+            fallback = [(0, a) for a in not_blocked if a not in result]
+            result += [a for _, a in fallback[:max_articles - len(result)]]
+
+        blocked_count = len(raw_articles) - len(not_blocked)
+        print(
+            f"📡 News: {len(raw_articles)} fetched → "
+            f"{blocked_count} blocked → {len(scored)} scored → "
+            f"{len(result)} used"
+        )
+        return result
 
     except Exception as e:
         print(f"⚠️  NewsAPI error: {e}")
@@ -251,6 +532,23 @@ def markdown_to_html(text):
     return '\n'.join(html_lines)
 
 
+# أدوار محددة وموثوقة للـ blockquote
+ANALYST_ROLES = [
+    "Enterprise AI architect",
+    "Semiconductor policy analyst",
+    "Cloud infrastructure strategist",
+    "Cybersecurity research lead",
+    "Quantum computing engineer",
+    "Digital health technology advisor",
+    "Energy transition analyst",
+    "Open-source ecosystem strategist",
+    "Emerging markets tech analyst",
+    "AI governance specialist",
+    "Supply chain technology expert",
+    "Fintech regulatory analyst",
+]
+
+
 def post_process_html(html):
     seen_h2 = []
 
@@ -262,9 +560,10 @@ def post_process_html(html):
         return m.group(0)
 
     html = re.sub(r'<h2[^>]*>(.*?)</h2>', dedup_h2, html, flags=re.IGNORECASE | re.DOTALL)
+    role = random.choice(ANALYST_ROLES)
     html = re.sub(
         r'—\s*(?:Dr\.|Prof\.|Mr\.|Ms\.|Mrs\.)?\s*[A-Z][a-z]+(?:\s+[A-Z][a-z]+)+[^<\n]{0,150}',
-        '— <em>Senior industry analyst</em>',
+        f'— <em>{role}</em>',
         html
     )
     return html
@@ -272,7 +571,7 @@ def post_process_html(html):
 # ══════════════════════════════════════════════
 #  GROQ — نموذج أقوى + retry
 # ══════════════════════════════════════════════
-def groq_call(system_msg, user_msg, max_tokens=2500):
+def groq_call(system_msg, user_msg, max_tokens=3500):
     MODEL = "llama-3.3-70b-versatile"
 
     for attempt in range(1, 4):
@@ -295,21 +594,33 @@ def groq_call(system_msg, user_msg, max_tokens=2500):
 # ══════════════════════════════════════════════
 #  META GENERATION
 # ══════════════════════════════════════════════
-def generate_meta(topic, used_titles):
-    """
-    توليد metadata مع تمرير العناوين المستخدمة لتجنب التكرار.
-    """
+def generate_meta(topic, used_titles=[]):
     used_str = "\n".join(f"- {t}" for t in used_titles[-20:]) if used_titles else "None"
 
-    system_msg = "You are a professional News SEO strategist. Generate metadata without fluff."
+    system_msg = (
+        "You are a senior editor at MIT Technology Review or The Economist. "
+        "You craft sharp, provocative headlines that make readers stop scrolling."
+    )
     user_msg = (
-        f"Generate metadata for: {topic}.\n\n"
-        f"IMPORTANT: These titles have already been used — DO NOT use them or anything similar:\n"
-        f"{used_str}\n\n"
-        "Output ONLY in this format:\n"
-        "[TITLE] (max 65 chars, news-style headline, MUST be unique)\n"
-        "[KEYWORDS] (3 comma-separated terms)\n"
-        "[META] (one compelling sentence under 155 chars)"
+        f"Generate SEO metadata for this topic: {topic}\n\n"
+        f"BANNED titles — do NOT reuse or paraphrase:\n{used_str}\n\n"
+        "TITLE RULES:\n"
+        "- Max 65 characters\n"
+        "- NEVER use prefixes like Update:, Report:, Analysis:, Breaking:\n"
+        "- Sharp and specific — strong verbs, contrasts, or surprising angles\n"
+        "- Style examples:\n"
+        "  * Why Europe AI Rules Are Backfiring\n"
+        "  * The Hidden Cost of Cheap Chips\n"
+        "  * Quantum's Encryption Reckoning\n"
+        "  * Open Source AI's Enterprise Moment\n"
+        "  * The Battery Race Nobody Is Winning\n"
+        "  * Chips, Power, and the AI Energy Crisis\n"
+        "  * When Robots Replace the Factory Floor\n"
+        "- Use surprising angles, contrasts, or provocative framings\n\n"
+        "Output ONLY in this exact format:\n"
+        "[TITLE] your headline here\n"
+        "[KEYWORDS] keyword1, keyword2, keyword3\n"
+        "[META] one compelling sentence under 155 chars"
     )
     raw = groq_call(system_msg, user_msg, max_tokens=300)
     if not raw:
@@ -319,54 +630,92 @@ def generate_meta(topic, used_titles):
     k = re.search(r"\[KEYWORDS\]\s*(.*)", raw, re.I)
     m = re.search(r"\[META\]\s*(.*)",     raw, re.I)
 
-    title    = t.group(1).strip() if t else f"Update: {topic}"
+    title    = t.group(1).strip() if t else topic[:65]
     keywords = k.group(1).strip() if k else "Tech, News, Innovation"
-    meta     = m.group(1).strip() if m else f"Latest analysis on {topic}."
+    meta     = m.group(1).strip() if m else f"An in-depth analysis of {topic}."
+
+    # إزالة أي prefix آلي تلقائياً
+    import re as _re
+    title = _re.sub(r"^(Update|Report|Analysis|Breaking|News):\s*", "", title, flags=_re.I).strip()
+
     return title, keywords, meta
 
 # ══════════════════════════════════════════════
 #  ARTICLE GENERATOR
 # ══════════════════════════════════════════════
 ARTICLE_STRUCTURES = [
-    "intro <p> → Section 1 <h2>+<p> → Section 2 <h2>+<p> → Key Takeaway <blockquote> → Outlook <h2>+<p> → Conclusion <p>",
-    "intro <p> → Background <h2>+<p> → Current Developments <h2>+<p><ul> → Expert View <blockquote> → What's Next <h2>+<p>",
-    "intro <p> → Market Context <h2>+<p> → Technical Analysis <h2>+<p> → Industry Impact <h2>+<p> → Analyst Quote <blockquote> → Summary <p>",
-    "intro <p> → The Challenge <h2>+<p> → The Solution Landscape <h2>+<p><ul> → Numbers in Context <h2>+<p> → Forward Outlook <blockquote>+<p>",
+    (
+        "intro <p>(2 sentences hook) → "
+        "Context <h2>+<p>(background + why it matters now) → "
+        "Key Developments <h2>+<p>+<ul>(3-4 specific points from news) → "
+        "Deep Analysis <h2>+<p>(cause-effect, implications, trade-offs) → "
+        "Expert Perspective <blockquote> → "
+        "What This Means <h2>+<p>(concrete impact on industry/users) → "
+        "Conclusion <p>(forward-looking, no fluff)"
+    ),
+    (
+        "hook <p>(start with a striking fact or contrast) → "
+        "The Problem <h2>+<p>(define the challenge clearly) → "
+        "Current Landscape <h2>+<p>+<ul>(who is doing what, from news) → "
+        "Competing Forces <h2>+<p>(tensions, trade-offs, opposing views) → "
+        "Analyst View <blockquote> → "
+        "The Numbers <h2>+<p>(data points, market size, growth) → "
+        "Outlook <p>(realistic assessment, not hype)"
+    ),
+    (
+        "intro <p>(frame the debate or shift) → "
+        "Historical Context <h2>+<p>(how we got here) → "
+        "Breaking Point <h2>+<p>(what changed recently, from news) → "
+        "Winners and Losers <h2>+<ul>(who benefits, who loses) → "
+        "Industry Voice <blockquote> → "
+        "Strategic Implications <h2>+<p>(what companies/governments should do) → "
+        "Final Take <p>(author's analytical conclusion)"
+    ),
+    (
+        "provocative hook <p>(challenge a common assumption) → "
+        "The Case For <h2>+<p>+<ul>(strongest arguments, evidence) → "
+        "The Case Against <h2>+<p>(counterarguments, risks) → "
+        "Evidence from the Field <h2>+<p>(specific examples from news) → "
+        "Expert Quote <blockquote> → "
+        "Balancing Act <h2>+<p>(nuanced synthesis) → "
+        "Verdict <p>(clear-eyed conclusion)"
+    ),
 ]
 
 
 def generate_article(title, topic, news_context):
     structure = random.choice(ARTICLE_STRUCTURES)
 
-    system_msg = """You are a Senior Tech Analyst at Smart Flow Lab writing a professional industry analysis.
+    system_msg = """You are a Senior Tech Analyst at Smart Flow Lab. You write deep, publication-quality industry analysis for an audience of executives, engineers, and policy professionals.
 
 ABSOLUTE RULES:
 1. HTML ONLY — use <h2>, <p>, <blockquote>, <ul>, <li>, <strong>, <em>. Zero Markdown.
-2. GROUND IN REAL NEWS — the user provides recent news headlines; reference them naturally 
-   (e.g. "According to [Source], ..."). NEVER invent sources not listed.
-3. NO INVENTED PEOPLE — no fake names. Use: "analysts note...", "industry observers suggest...",
-   "according to [real source from context]...".
-4. NO INVENTED PRODUCTS — discuss real confirmed technologies only.
-5. NO FAKE STATISTICS — if citing a number, it must come from the provided news context.
-   Otherwise use: "estimates vary", "industry reports suggest ranges of X to Y".
-6. BLOCKQUOTE format — anonymous industry voice:
-   <blockquote style="border-left: 3px solid #cc0000; padding: 12px 20px; margin: 20px 0; 
-   background: #fafafa; font-style: italic; color: #444;">
-   "..." — <em>Senior analyst, [relevant sector]</em></blockquote>
-7. TONE — Analytical, precise, objective. No hype. Write like The Economist, not a press release.
-8. LENGTH — 750–850 words of actual content."""
+2. LENGTH — 1100–1300 words of actual substantive content. This is non-negotiable.
+3. NO REPETITION — each paragraph must introduce NEW information or analysis. Never restate what was already said.
+4. GROUND IN REAL NEWS — reference provided sources naturally (e.g. "According to [Source], ..."). NEVER invent sources.
+5. NO INVENTED PEOPLE — no fake names. Use: "analysts note...", "industry observers suggest...", "according to [Source]...".
+6. NO FAKE STATISTICS — numbers must come from the provided news context. Otherwise: "estimates vary" or "industry reports suggest X to Y range".
+7. DEPTH REQUIRED — go beyond describing events. Explain WHY it matters, WHAT the trade-offs are, WHO wins and loses, HOW it connects to broader trends.
+8. BLOCKQUOTE — one sharp, specific industry voice (not generic):
+   <blockquote style="border-left: 3px solid #cc0000; padding: 12px 20px; margin: 20px 0; background: #fafafa; font-style: italic; color: #444;">
+   "..." — <em>[specific role, e.g. 'Semiconductor policy analyst' or 'Enterprise AI architect']</em></blockquote>
+9. TONE — The Economist meets MIT Technology Review. Precise, analytical, no hype, no corporate speak.
+10. STRONG OPENING — first sentence must hook the reader with a fact, paradox, or sharp observation. NOT a generic intro."""
 
     user_msg = (
-        f"Write an industry analysis article.\n\n"
+        f"Write a deep industry analysis article. Target: 1100-1300 words.\n\n"
         f"Title: {title}\n"
         f"Topic: {topic}\n"
         f"Date: {today_date}\n\n"
-        f"Structure to follow:\n{structure}\n\n"
+        f"Structure to follow EXACTLY:\n{structure}\n\n"
         f"{news_context}\n\n"
-        "Instructions:\n"
-        "- Reference the real news sources naturally inside the article\n"
-        "- Pure HTML only, no Markdown\n"
-        "- Be specific and analytical, not generic"
+        "QUALITY REQUIREMENTS:\n"
+        "- Every section must add NEW analysis, not repeat previous points\n"
+        "- At least 2-3 specific data points or concrete examples from the news context\n"
+        "- Explain cause-effect relationships, not just describe events\n"
+        "- Identify at least one non-obvious implication or tension\n"
+        "- Pure HTML only, zero Markdown\n"
+        "- The blockquote must be specific to this topic, not generic industry speak"
     )
 
     raw = groq_call(system_msg, user_msg)
@@ -547,39 +896,49 @@ def post_to_blogger_api(title, html_content, keywords):
 #  MAIN
 # ══════════════════════════════════════════════
 def main():
-    print("🚀 Smart Flow Lab Publisher v3 — starting...")
+    print("🚀 Smart Flow Lab Publisher v5 — Infinite Topics — starting...")
 
-    # 1. تحميل تاريخ المنشورات
-    history = load_history()
-    print(f"📋 Published so far: {len(history.get('topics', []))} topics, {len(history.get('titles', []))} titles")
+    # 1. جلب العناوين الموجودة مباشرة من Blogger — لا ملفات محلية
+    used_titles = get_published_titles_from_blogger()
 
-    # 2. اختيار موضوع غير مكرر
-    chosen        = get_next_topic(history)
+    # 2. AI يولّد موضوعاً فريداً بناءً على أخبار اليوم
+    chosen        = get_next_topic(used_titles)
     topic         = chosen["topic"]
     image_queries = chosen["image_queries"]
     newsapi_query = chosen["newsapi_query"]
 
-    # 3. جلب أخبار حقيقية
-    print(f"📡 Fetching real news for: {newsapi_query}")
-    articles     = fetch_real_news(newsapi_query, max_articles=5)
+    # 3. جلب أخبار متعمقة للموضوع المختار مع فلتر صارم
+    print(f"📡 Fetching deep news for: {newsapi_query}")
+    articles     = fetch_real_news(newsapi_query, topic=topic, max_articles=7)
     news_context = format_news_for_prompt(articles)
     sources_html = build_sources_html(articles)
 
-    # 4. توليد metadata مع تمرير العناوين المستخدمة
-    title, keywords, meta = generate_meta(topic, history.get("titles", []))
+    # 4. توليد metadata — يمرر العناوين الموجودة لتجنب التشابه
+    title, keywords, meta = generate_meta(topic, used_titles)
     if not title:
         print("❌ Metadata generation failed. Stopping.")
         return
 
-    # 5. التحقق من عدم تكرار العنوان — retry مرة واحدة إذا مكرر
-    if is_title_duplicate(title, history):
-        print(f"⚠️ Duplicate title detected: '{title}' — regenerating...")
-        title, keywords, meta = generate_meta(topic, history.get("titles", []))
-        if not title or is_title_duplicate(title, history):
-            print("❌ Could not generate unique title. Stopping.")
-            return
+    # 5. التحقق من عدم تكرار العنوان — retry مرتين إذا مكرر
+    attempts = 0
+    while is_title_duplicate(title, used_titles) and attempts < 2:
+        attempts += 1
+        print(f"⚠️ Duplicate title: '{title}' — retry {attempts}...")
+        title, keywords, meta = generate_meta(topic, used_titles)
 
-    print(f"📰 Title: {title}")
+    if is_title_duplicate(title, used_titles):
+        print("❌ Could not generate unique title after retries. Stopping.")
+        return
+
+    # ── تنظيف نهائي مضمون — حذف أي prefix آلي قبل النشر ──
+    title = re.sub(
+        r"^(Update|Report|Analysis|Breaking|News|Review|Overview)[\s:.\-]+",
+        "", title, flags=re.I
+    ).strip()
+    if title:
+        title = title[0].upper() + title[1:]
+
+    print(f"📰 Final title: {title}")
 
     # 6. توليد المقال
     content = generate_article(title, topic, news_context)
@@ -593,13 +952,9 @@ def main():
     # 8. بناء HTML الكامل
     full_html = build_full_html(title, content, img, meta, sources_html, keywords)
 
-    # 9. النشر — نسجّل فقط إذا نجح النشر
-    try:
-        post_to_blogger_api(title, full_html, keywords)
-        record_published(history, topic, title)
-        print("🎉 Done! History updated.")
-    except Exception as e:
-        print(f"❌ Publish failed — history NOT updated: {e}")
+    # 9. النشر
+    post_to_blogger_api(title, full_html, keywords)
+    print("🎉 Done!")
 
 
 if __name__ == "__main__":
