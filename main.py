@@ -115,14 +115,10 @@ def save_history(history):
 
 
 def get_next_topic(history):
-    """
-    اختيار موضوع لم يُنشر بعد.
-    إذا انتهت كل المواضيع يبدأ دورة جديدة.
-    """
+    """اختيار موضوع لم يُنشر بعد، أو بدء دورة جديدة."""
     used_topics = set(history.get("topics", []))
     available   = [t for t in TOPIC_ANGLES if t["topic"] not in used_topics]
 
-    # إذا انتهت كل المواضيع — دورة جديدة
     if not available:
         print("🔄 All topics used — starting new cycle")
         history["topics"] = []
@@ -143,7 +139,6 @@ def record_published(history, topic, title):
     """تسجيل الموضوع والعنوان المنشور."""
     history.setdefault("topics", []).append(topic)
     history.setdefault("titles", []).append(title)
-    # الاحتفاظ بآخر 100 عنوان فقط
     history["titles"] = history["titles"][-100:]
     save_history(history)
 
@@ -270,7 +265,7 @@ def post_process_html(html):
     return html
 
 # ══════════════════════════════════════════════
-#  GROQ — نموذج أقوى + retry
+#  GROQ — استدعاء النموذج
 # ══════════════════════════════════════════════
 def groq_call(system_msg, user_msg, max_tokens=2500):
     MODEL = "llama-3.3-70b-versatile"
@@ -293,33 +288,53 @@ def groq_call(system_msg, user_msg, max_tokens=2500):
     return None
 
 # ══════════════════════════════════════════════
-#  META GENERATION
+#  META GENERATION (اصلاح جذري للعنوان عبر JSON)
 # ══════════════════════════════════════════════
 def generate_meta(topic, used_titles):
     """
-    توليد metadata مع تمرير العناوين المستخدمة لتجنب التكرار.
+    توليد metadata بصيغة JSON لتجنب أخطاء الـ Regex ومنع تكرار كلمة Update.
     """
     used_str = "\n".join(f"- {t}" for t in used_titles[-20:]) if used_titles else "None"
 
-    system_msg = "You are a professional News SEO strategist. Generate metadata without fluff."
-    user_msg = (
-        f"Generate metadata for: {topic}.\n\n"
-        f"IMPORTANT: These titles have already been used — DO NOT use them or anything similar:\n"
-        f"{used_str}\n\n"
-        "Output ONLY in this format:\n"
-        "[TITLE] (max 65 chars, news-style headline, MUST be unique)\n"
-        "[KEYWORDS] (3 comma-separated terms)\n"
-        "[META] (one compelling sentence under 155 chars)"
+    system_msg = (
+        "You are a professional News SEO strategist. You must respond ONLY with a valid JSON object. "
+        "Do not include any markdown formatting like ```json or any conversational text. "
+        "Your response must be parseable by json.loads() in Python."
     )
+    user_msg = (
+        f"Generate unique news metadata for the topic: {topic}.\n\n"
+        f"IMPORTANT: These titles have already been used — DO NOT use or copy them:\n{used_str}\n\n"
+        "Respond strictly with a JSON object using this exact structure:\n"
+        "{\n"
+        '  "title": "A unique, compelling news-style headline under 65 characters",\n'
+        '  "keywords": "3 comma-separated SEO terms",\n'
+        '  "meta": "One compelling summary sentence under 155 characters"\n'
+        "}"
+    )
+    
     raw = groq_call(system_msg, user_msg, max_tokens=300)
     if not raw:
         return None, None, None
 
-    t = re.search(r"\[TITLE\]\s*(.*)",    raw, re.I)
-    k = re.search(r"\[KEYWORDS\]\s*(.*)", raw, re.I)
-    m = re.search(r"\[META\]\s*(.*)",     raw, re.I)
-
-    title    = t.group(1).strip() if t else f"Update: {topic}"
+    try:
+        # استخراج الـ JSON بأمان حتى لو أضاف النموذج نصوصاً جانبية بالخطأ
+        clean_json = re.search(r"\{.*\}", raw, re.DOTALL)
+        if clean_json:
+            data = json.loads(clean_json.group(0))
+            title = data.get("title", "").strip()
+            keywords = data.get("keywords", "").strip()
+            meta = data.get("meta", "").strip()
+            if title:
+                return title, keywords, meta
+    except Exception as e:
+        print(f"⚠️ JSON parsing failed, trying fallback regex: {e}")
+        
+    # خطة دفاعية احتياطية (Fallback Regex) في حال فشل الـ JSON لأي سبب تقني
+    t = re.search(r'"title":\s*"(.*?)"', raw, re.I)
+    k = re.search(r'"keywords":\s*"(.*?)"', raw, re.I)
+    m = re.search(r'"meta":\s*"(.*?)"', raw, re.I)
+    
+    title    = t.group(1).strip() if t else f"Analysis on {topic}"
     keywords = k.group(1).strip() if k else "Tech, News, Innovation"
     meta     = m.group(1).strip() if m else f"Latest analysis on {topic}."
     return title, keywords, meta
@@ -384,7 +399,7 @@ def get_best_pexels_image(image_queries):
     try:
         query = random.choice(image_queries)
         url = (
-            f"https://api.pexels.com/v1/search"
+            f"[https://api.pexels.com/v1/search](https://api.pexels.com/v1/search)"
             f"?query={urllib.parse.quote(query)}&per_page=15&orientation=landscape"
         )
         res = requests.get(
@@ -401,14 +416,14 @@ def get_best_pexels_image(image_queries):
     except Exception as e:
         print(f"⚠️ Pexels error: {e} — using fallback")
         hash_seed = abs(hash(str(image_queries))) % 1000
-        return f"https://picsum.photos/seed/{hash_seed}/1200/630"
+        return f"[https://picsum.photos/seed/](https://picsum.photos/seed/){hash_seed}/1200/630"
 
 # ══════════════════════════════════════════════
 #  HTML BUILDER
 # ══════════════════════════════════════════════
 def build_full_html(title, content, img, meta, sources_html, keywords):
     schema = {
-        "@context": "https://schema.org",
+        "@context": "[https://schema.org](https://schema.org)",
         "@type": "NewsArticle",
         "headline": title,
         "description": meta,
@@ -430,7 +445,7 @@ def build_full_html(title, content, img, meta, sources_html, keywords):
             "name": "Smart Flow Lab",
             "logo": {
                 "@type": "ImageObject",
-                "url": "https://owlab.blogspot.com/favicon.ico"
+                "url": "[https://owlab.blogspot.com/favicon.ico](https://owlab.blogspot.com/favicon.ico)"
             }
         },
         "mainEntityOfPage": {
@@ -443,7 +458,6 @@ def build_full_html(title, content, img, meta, sources_html, keywords):
 
 <div style="font-family: 'Georgia', serif; line-height: 1.85; color: #1a1a1a; max-width: 820px; margin: auto; padding: 24px 20px;">
 
-    <!-- HEADER -->
     <header style="border-bottom: 3px solid #cc0000; padding-bottom: 18px; margin-bottom: 32px;">
         <p style="color: #cc0000; font-size: 12px; font-weight: bold; letter-spacing: 2px; 
                   text-transform: uppercase; margin-bottom: 10px;">
@@ -462,7 +476,6 @@ def build_full_html(title, content, img, meta, sources_html, keywords):
         </p>
     </header>
 
-    <!-- MAIN IMAGE -->
     <figure style="margin: 0 0 32px 0;">
         <img src="{img}" alt="{title}" 
              style="width: 100%; height: auto; border-radius: 6px; display: block;">
@@ -472,15 +485,12 @@ def build_full_html(title, content, img, meta, sources_html, keywords):
         </figcaption>
     </figure>
 
-    <!-- ARTICLE CONTENT -->
     <div style="font-size: 17px; color: #1a1a1a;">
         {content}
     </div>
 
-    <!-- SOURCES SECTION -->
     {sources_html}
 
-    <!-- AUTHOR BIO -->
     <div style="margin-top: 48px; padding: 24px; background: #f9f9f9; 
                 border-left: 4px solid #cc0000; border-radius: 0 4px 4px 0;">
         <strong style="font-size: 18px; color: #111;">Mohamed Ismaili</strong><br>
@@ -491,18 +501,16 @@ def build_full_html(title, content, img, meta, sources_html, keywords):
         </span>
     </div>
 
-    <!-- DISCLAIMER -->
     <div style="margin-top: 24px; padding: 14px; background: #fff8f8; 
                 border: 1px solid #f0dede; border-radius: 4px; font-size: 12px; color: #888;">
         <strong>Editorial Note:</strong> This analysis is based on publicly available industry 
         information and recent news sources. All opinions expressed are those of the author.
     </div>
 
-    <!-- FOOTER -->
     <footer style="margin-top: 40px; text-align: center; font-size: 11px; color: #bbb;
                    border-top: 1px solid #eee; padding-top: 20px;">
         &copy; {current_year} Smart Flow Lab. All rights reserved. &nbsp;|&nbsp;
-        <a href="https://owlab.blogspot.com" 
+        <a href="[https://owlab.blogspot.com](https://owlab.blogspot.com)" 
            style="color: #bbb; text-decoration: none;">owlab.blogspot.com</a>
     </footer>
 </div>
@@ -516,7 +524,7 @@ def post_to_blogger_api(title, html_content, keywords):
         creds = Credentials(
             None,
             refresh_token=REFRESH_TOKEN,
-            token_uri="https://oauth2.googleapis.com/token",
+            token_uri="[https://oauth2.googleapis.com/token](https://oauth2.googleapis.com/token)",
             client_id=CLIENT_ID,
             client_secret=CLIENT_SECRET,
         )
@@ -541,13 +549,13 @@ def post_to_blogger_api(title, html_content, keywords):
         print(f"✅ Published: {title}")
     except Exception as e:
         print(f"❌ Blogger API Error: {e}")
-        raise  # re-raise حتى لا يُسجَّل كمنشور ناجح
+        raise
 
 # ══════════════════════════════════════════════
 #  MAIN
 # ══════════════════════════════════════════════
 def main():
-    print("🚀 Smart Flow Lab Publisher v3 — starting...")
+    print("🚀 Smart Flow Lab Publisher v3.1 — starting...")
 
     # 1. تحميل تاريخ المنشورات
     history = load_history()
