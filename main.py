@@ -1,4 +1,4 @@
-import os
+Import os
 import re
 import datetime
 import urllib.parse
@@ -288,12 +288,9 @@ def groq_call(system_msg, user_msg, max_tokens=2500):
     return None
 
 # ══════════════════════════════════════════════
-#  META GENERATION (تم إصلاح الروابط الداخلية بالكامل)
+#  META GENERATION
 # ══════════════════════════════════════════════
 def generate_meta(topic, used_titles):
-    """
-    توليد metadata بصيغة JSON لتجنب أخطاء الـ Regex ومنع تكرار كلمة Update.
-    """
     used_str = "\n".join(f"- {t}" for t in used_titles[-20:]) if used_titles else "None"
 
     system_msg = (
@@ -397,7 +394,7 @@ def get_best_pexels_image(image_queries):
     try:
         query = random.choice(image_queries)
         url = (
-            "https://api.pexels.com/v1/search"
+            "[https://api.pexels.com/v1/search](https://api.pexels.com/v1/search)"
             f"?query={urllib.parse.quote(query)}&per_page=15&orientation=landscape"
         )
         res = requests.get(
@@ -414,14 +411,14 @@ def get_best_pexels_image(image_queries):
     except Exception as e:
         print(f"⚠️ Pexels error: {e} — using fallback")
         hash_seed = abs(hash(str(image_queries))) % 1000
-        return f"https://picsum.photos/seed/{hash_seed}/1200/630"
+        return f"[https://picsum.photos/seed/](https://picsum.photos/seed/){hash_seed}/1200/630"
 
 # ══════════════════════════════════════════════
 #  HTML BUILDER
 # ══════════════════════════════════════════════
 def build_full_html(title, content, img, meta, sources_html, keywords):
     schema = {
-        "@context": "https://schema.org",
+        "@context": "[https://schema.org](https://schema.org)",
         "@type": "NewsArticle",
         "headline": title,
         "description": meta,
@@ -443,7 +440,7 @@ def build_full_html(title, content, img, meta, sources_html, keywords):
             "name": "Smart Flow Lab",
             "logo": {
                 "@type": "ImageObject",
-                "url": "https://owlab.blogspot.com/favicon.ico"
+                "url": "[https://owlab.blogspot.com/favicon.ico](https://owlab.blogspot.com/favicon.ico)"
             }
         },
         "mainEntityOfPage": {
@@ -508,7 +505,7 @@ def build_full_html(title, content, img, meta, sources_html, keywords):
     <footer style="margin-top: 40px; text-align: center; font-size: 11px; color: #bbb;
                    border-top: 1px solid #eee; padding-top: 20px;">
         &copy; {current_year} Smart Flow Lab. All rights reserved. &nbsp;|&nbsp;
-        <a href="https://owlab.blogspot.com" 
+        <a href="[https://owlab.blogspot.com](https://owlab.blogspot.com)" 
            style="color: #bbb; text-decoration: none;">owlab.blogspot.com</a>
     </footer>
 </div>
@@ -522,7 +519,7 @@ def post_to_blogger_api(title, html_content, keywords):
         creds = Credentials(
             None,
             refresh_token=REFRESH_TOKEN,
-            token_uri="https://oauth2.googleapis.com/token",
+            token_uri="[https://oauth2.googleapis.com/token](https://oauth2.googleapis.com/token)",
             client_id=CLIENT_ID,
             client_secret=CLIENT_SECRET,
         )
