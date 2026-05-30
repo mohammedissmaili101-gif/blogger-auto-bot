@@ -1,7 +1,8 @@
 {
   "topics": [
     "The rise of edge computing and its impact on real-time AI applications",
-    "Advancements in biotechnology and AI-driven drug discovery efficiency"
+    "Advancements in biotechnology and AI-driven drug discovery efficiency",
+    "Quantum computing milestones and the threat to modern encryption standards"
   ],
   "titles": [
     "Edge AI Revolution",
@@ -29,6 +30,7 @@
     "AI Pulse",
     "Auto Rule",
     "AI Edge Rush",
-    "BioTech Boost"
+    "BioTech Boost",
+    "Code Crackdown"
   ]
 }
