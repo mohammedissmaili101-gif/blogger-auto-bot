@@ -267,7 +267,7 @@ def post_process_html(html):
 # ══════════════════════════════════════════════
 #  GROQ — استدعاء النموذج
 # ══════════════════════════════════════════════
-def groq_call(system_msg, user_msg, max_tokens=2500):
+def groq_call(system_msg, user_msg, max_tokens=2500, temp=0.45):
     MODEL = "llama-3.3-70b-versatile"
 
     for attempt in range(1, 4):
@@ -278,7 +278,7 @@ def groq_call(system_msg, user_msg, max_tokens=2500):
                     {"role": "user",   "content": user_msg}
                 ],
                 model=MODEL,
-                temperature=0.45,
+                temperature=temp,
                 max_tokens=max_tokens,
             )
             return completion.choices[0].message.content
@@ -290,7 +290,7 @@ def groq_call(system_msg, user_msg, max_tokens=2500):
 # ══════════════════════════════════════════════
 #  META GENERATION (تم إصلاح الروابط الداخلية بالكامل)
 # ══════════════════════════════════════════════
-def generate_meta(topic, used_titles):
+def generate_meta(topic, used_titles, temp=0.45):
     """
     توليد metadata بصيغة JSON لتجنب أخطاء الـ Regex ومنع تكرار كلمة Update.
     """
@@ -301,8 +301,14 @@ def generate_meta(topic, used_titles):
         "Do not include any markdown formatting like ```json or any conversational text. "
         "Your response must be parseable by json.loads() in Python."
     )
+    
+    # تحسين الـ prompt فاش كتكون الـ temperature طالعة باش يبعد على التكرار تماما
+    avoid_extra = ""
+    if temp > 0.5:
+        avoid_extra = " CRITICAL: Create a completely distinct angle. Avoid generic terms or phrasing used in previous titles."
+
     user_msg = (
-        f"Generate unique news metadata for the topic: {topic}.\n\n"
+        f"Generate unique news metadata for the topic: {topic}.{avoid_extra}\n\n"
         f"IMPORTANT: These titles have already been used — DO NOT use or copy them:\n{used_str}\n\n"
         "Respond strictly with a JSON object using this exact structure:\n"
         "{\n"
@@ -312,7 +318,7 @@ def generate_meta(topic, used_titles):
         "}"
     )
     
-    raw = groq_call(system_msg, user_msg, max_tokens=300)
+    raw = groq_call(system_msg, user_msg, max_tokens=300, temp=temp)
     if not raw:
         return None, None, None
 
@@ -397,7 +403,7 @@ def get_best_pexels_image(image_queries):
     try:
         query = random.choice(image_queries)
         url = (
-            "https://api.pexels.com/v1/search"
+            "[https://api.pexels.com/v1/search](https://api.pexels.com/v1/search)"
             f"?query={urllib.parse.quote(query)}&per_page=15&orientation=landscape"
         )
         res = requests.get(
@@ -414,14 +420,14 @@ def get_best_pexels_image(image_queries):
     except Exception as e:
         print(f"⚠️ Pexels error: {e} — using fallback")
         hash_seed = abs(hash(str(image_queries))) % 1000
-        return f"https://picsum.photos/seed/{hash_seed}/1200/630"
+        return f"[https://picsum.photos/seed/](https://picsum.photos/seed/){hash_seed}/1200/630"
 
 # ══════════════════════════════════════════════
 #  HTML BUILDER
 # ══════════════════════════════════════════════
 def build_full_html(title, content, img, meta, sources_html, keywords):
     schema = {
-        "@context": "https://schema.org",
+        "@context": "[https://schema.org](https://schema.org)",
         "@type": "NewsArticle",
         "headline": title,
         "description": meta,
@@ -443,7 +449,7 @@ def build_full_html(title, content, img, meta, sources_html, keywords):
             "name": "Smart Flow Lab",
             "logo": {
                 "@type": "ImageObject",
-                "url": "https://owlab.blogspot.com/favicon.ico"
+                "url": "[https://owlab.blogspot.com/favicon.ico](https://owlab.blogspot.com/favicon.ico)"
             }
         },
         "mainEntityOfPage": {
@@ -508,7 +514,7 @@ def build_full_html(title, content, img, meta, sources_html, keywords):
     <footer style="margin-top: 40px; text-align: center; font-size: 11px; color: #bbb;
                    border-top: 1px solid #eee; padding-top: 20px;">
         &copy; {current_year} Smart Flow Lab. All rights reserved. &nbsp;|&nbsp;
-        <a href="https://owlab.blogspot.com" 
+        <a href="[https://owlab.blogspot.com](https://owlab.blogspot.com)" 
            style="color: #bbb; text-decoration: none;">owlab.blogspot.com</a>
     </footer>
 </div>
@@ -522,7 +528,7 @@ def post_to_blogger_api(title, html_content, keywords):
         creds = Credentials(
             None,
             refresh_token=REFRESH_TOKEN,
-            token_uri="https://oauth2.googleapis.com/token",
+            token_uri="[https://oauth2.googleapis.com/token](https://oauth2.googleapis.com/token)",
             client_id=CLIENT_ID,
             client_secret=CLIENT_SECRET,
         )
@@ -577,13 +583,20 @@ def main():
         print("❌ Metadata generation failed. Stopping.")
         return
 
-    # 5. التحقق من عدم تكرار العنوان — retry مرة واحدة إذا مكرر
-    if is_title_duplicate(title, history):
-        print(f"⚠️ Duplicate title detected: '{title}' — regenerating...")
-        title, keywords, meta = generate_meta(topic, history.get("titles", []))
-        if not title or is_title_duplicate(title, history):
-            print("❌ Could not generate unique title. Stopping.")
-            return
+    # 5. التحقق من عدم تكرار العنوان — المحاولة حتى 5 مرات مع رفع الـ temperature تلقائياً
+    attempts = 1
+    max_attempts = 5
+    current_temp = 0.45
+    
+    while is_title_duplicate(title, history) and attempts < max_attempts:
+        current_temp += 0.12  # نرفع الـ temperature باش يخرج من التكرار مجبراً
+        print(f"⚠️ Duplicate title detected: '{title}' — regenerating (Attempt {attempts + 1}/{max_attempts}, temp={current_temp:.2f})...")
+        title, keywords, meta = generate_meta(topic, history.get("titles", []), temp=current_temp)
+        attempts += 1
+
+    if not title or is_title_duplicate(title, history):
+        print("❌ Could not generate unique title after multiple retries. Stopping.")
+        return
 
     print(f"📰 Title: {title}")
 
