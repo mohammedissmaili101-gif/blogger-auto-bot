@@ -1,17 +1,6 @@
 {
   "topics": [
-    "The rise of edge computing and its impact on real-time AI applications",
-    "Advancements in biotechnology and AI-driven drug discovery efficiency",
-    "Quantum computing milestones and the threat to modern encryption standards",
-    "Digital health transformation: AI diagnostics and remote patient monitoring",
-    "Global semiconductor supply chain shifts and geopolitical impact on tech",
-    "Big Tech antitrust regulations: Europe vs. Silicon Valley's legal landscape",
-    "Open-source AI models vs proprietary systems: the enterprise dilemma",
-    "Sustainable energy tech: Next-generation battery storage and hydrogen power",
-    "Autonomous vehicles and the regulatory road ahead in 2025",
-    "Emerging cybersecurity protocols for protecting decentralized financial data",
-    "Latest developments in Generative AI architectures and LLM training costs",
-    "The economics of cloud computing: hyperscalers and the cost efficiency race"
+    "Emerging cybersecurity protocols for protecting decentralized financial data"
   ],
   "titles": [
     "Edge AI Revolution",
@@ -49,6 +38,7 @@
     "Drive Ahead",
     "Crypto Shield",
     "AI Leap",
-    "Cloud Scale Wars"
+    "Cloud Scale Wars",
+    "DeFi Secure"
   ]
 }
