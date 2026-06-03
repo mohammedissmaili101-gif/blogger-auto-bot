@@ -288,7 +288,7 @@ def groq_call(system_msg, user_msg, max_tokens=2500, temp=0.45):
     return None
 
 # ══════════════════════════════════════════════
-#  META GENERATION (تم إصلاح الروابط الداخلية بالكامل)
+#  META GENERATION
 # ══════════════════════════════════════════════
 def generate_meta(topic, used_titles, temp=0.45):
     """
@@ -301,8 +301,7 @@ def generate_meta(topic, used_titles, temp=0.45):
         "Do not include any markdown formatting like ```json or any conversational text. "
         "Your response must be parseable by json.loads() in Python."
     )
-    
-    # تحسين الـ prompt فاش كتكون الـ temperature طالعة باش يبعد على التكرار تماما
+
     avoid_extra = ""
     if temp > 0.5:
         avoid_extra = " CRITICAL: Create a completely distinct angle. Avoid generic terms or phrasing used in previous titles."
@@ -317,7 +316,7 @@ def generate_meta(topic, used_titles, temp=0.45):
         '  "meta": "One compelling summary sentence under 155 characters"\n'
         "}"
     )
-    
+
     raw = groq_call(system_msg, user_msg, max_tokens=300, temp=temp)
     if not raw:
         return None, None, None
@@ -333,11 +332,11 @@ def generate_meta(topic, used_titles, temp=0.45):
                 return title, keywords, meta
     except Exception as e:
         print(f"⚠️ JSON parsing failed, trying fallback regex: {e}")
-        
+
     t = re.search(r'"title":\s*"(.*?)"', raw, re.I)
     k = re.search(r'"keywords":\s*"(.*?)"', raw, re.I)
     m = re.search(r'"meta":\s*"(.*?)"', raw, re.I)
-    
+
     title    = t.group(1).strip() if t else f"Analysis on {topic}"
     keywords = k.group(1).strip() if k else "Tech, News, Innovation"
     meta     = m.group(1).strip() if m else f"Latest analysis on {topic}."
@@ -403,7 +402,7 @@ def get_best_pexels_image(image_queries):
     try:
         query = random.choice(image_queries)
         url = (
-            "[https://api.pexels.com/v1/search](https://api.pexels.com/v1/search)"
+            "https://api.pexels.com/v1/search"
             f"?query={urllib.parse.quote(query)}&per_page=15&orientation=landscape"
         )
         res = requests.get(
@@ -420,14 +419,14 @@ def get_best_pexels_image(image_queries):
     except Exception as e:
         print(f"⚠️ Pexels error: {e} — using fallback")
         hash_seed = abs(hash(str(image_queries))) % 1000
-        return f"[https://picsum.photos/seed/](https://picsum.photos/seed/){hash_seed}/1200/630"
+        return f"https://picsum.photos/seed/{hash_seed}/1200/630"
 
 # ══════════════════════════════════════════════
 #  HTML BUILDER
 # ══════════════════════════════════════════════
 def build_full_html(title, content, img, meta, sources_html, keywords):
     schema = {
-        "@context": "[https://schema.org](https://schema.org)",
+        "@context": "https://schema.org",
         "@type": "NewsArticle",
         "headline": title,
         "description": meta,
@@ -449,7 +448,7 @@ def build_full_html(title, content, img, meta, sources_html, keywords):
             "name": "Smart Flow Lab",
             "logo": {
                 "@type": "ImageObject",
-                "url": "[https://owlab.blogspot.com/favicon.ico](https://owlab.blogspot.com/favicon.ico)"
+                "url": "https://owlab.blogspot.com/favicon.ico"
             }
         },
         "mainEntityOfPage": {
@@ -514,7 +513,7 @@ def build_full_html(title, content, img, meta, sources_html, keywords):
     <footer style="margin-top: 40px; text-align: center; font-size: 11px; color: #bbb;
                    border-top: 1px solid #eee; padding-top: 20px;">
         &copy; {current_year} Smart Flow Lab. All rights reserved. &nbsp;|&nbsp;
-        <a href="[https://owlab.blogspot.com](https://owlab.blogspot.com)" 
+        <a href="https://owlab.blogspot.com" 
            style="color: #bbb; text-decoration: none;">owlab.blogspot.com</a>
     </footer>
 </div>
@@ -528,7 +527,7 @@ def post_to_blogger_api(title, html_content, keywords):
         creds = Credentials(
             None,
             refresh_token=REFRESH_TOKEN,
-            token_uri="[https://oauth2.googleapis.com/token](https://oauth2.googleapis.com/token)",
+            token_uri="https://oauth2.googleapis.com/token",
             client_id=CLIENT_ID,
             client_secret=CLIENT_SECRET,
         )
@@ -587,9 +586,9 @@ def main():
     attempts = 1
     max_attempts = 5
     current_temp = 0.45
-    
+
     while is_title_duplicate(title, history) and attempts < max_attempts:
-        current_temp += 0.12  # نرفع الـ temperature باش يخرج من التكرار مجبراً
+        current_temp += 0.12
         print(f"⚠️ Duplicate title detected: '{title}' — regenerating (Attempt {attempts + 1}/{max_attempts}, temp={current_temp:.2f})...")
         title, keywords, meta = generate_meta(topic, history.get("titles", []), temp=current_temp)
         attempts += 1
