@@ -2,14 +2,13 @@ name: Blogger Professional Bot
 
 on:
   schedule:
-    - cron: '0 */8 * * *'
+    - cron: '0 8 * * *'  # ينشر مرة واحدة يومياً الساعة 8 صباحاً UTC
   workflow_dispatch:
 
 jobs:
   post_job:
     runs-on: ubuntu-latest
-    
-    # 🔽 زدنا هاد السطور هنا باش الـ Bot تكون عندو صلاحية يدير Push للكود
+
     permissions:
       contents: write
 
@@ -27,7 +26,30 @@ jobs:
           python -m pip install --upgrade pip
           pip install groq requests google-auth-oauthlib google-api-python-client
 
+      - name: Check if Already Posted Today
+        id: check_post
+        run: |
+          TODAY=$(date +%Y-%m-%d)
+          if [ -f published_history.json ]; then
+            LAST_DATE=$(python3 -c "
+          import json
+          with open('published_history.json', 'r') as f:
+              data = json.load(f)
+          posts = data if isinstance(data, list) else data.get('posts', [])
+          print(posts[-1].get('date', '')[:10] if posts else '')
+          " 2>/dev/null || echo "")
+            if [ "$LAST_DATE" = "$TODAY" ]; then
+              echo "already_posted=true" >> $GITHUB_OUTPUT
+              echo "✅ تم النشر اليوم بالفعل، لا داعي للنشر مجدداً"
+            else
+              echo "already_posted=false" >> $GITHUB_OUTPUT
+            fi
+          else
+            echo "already_posted=false" >> $GITHUB_OUTPUT
+          fi
+
       - name: Run Auto Bot
+        if: steps.check_post.outputs.already_posted == 'false'
         env:
           GROQ_API_KEY: ${{ secrets.GROQ_API_KEY }}
           PEXELS_API_KEY: ${{ secrets.PEXELS_API_KEY }}
@@ -37,8 +59,8 @@ jobs:
           BLOGGER_REFRESH_TOKEN: ${{ secrets.BLOGGER_REFRESH_TOKEN }}
         run: python main.py
 
-      # 🔽 هادي هي الخطوة السحرية اللي غاتحفظ ملف الـ JSON وترجعو للمستودع 🔽
       - name: Commit and Push History File
+        if: steps.check_post.outputs.already_posted == 'false'
         run: |
           git config --global user.name "github-actions[bot]"
           git config --global user.email "github-actions[bot]@users.noreply.github.com"
