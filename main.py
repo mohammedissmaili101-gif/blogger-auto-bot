@@ -234,6 +234,9 @@ def markdown_to_html(text):
 
 
 def post_process_html(html):
+    # Remove any bare "My Take" h2 that model generates before the placeholder
+    html = re.sub(r'<h2[^>]*>\s*My Take\s*</h2>\s*', '', html, flags=re.IGNORECASE)
+
     seen_h2 = []
 
     def dedup_h2(m):
@@ -376,10 +379,10 @@ def generate_personal_analysis(title, topic, news_context):
 #  ARTICLE GENERATOR — جودة صحفية احترافية
 # ══════════════════════════════════════════════
 ARTICLE_STRUCTURES = [
-    "intro_paragraph → Background [h2] → Current Developments [h2 + p + ul] → Market Impact [h2 + p] → Expert Perspective [blockquote] → My Take [h2 + p — personal analysis] → Outlook [h2 + p]",
-    "intro_paragraph → The Context [h2 + p] → What Changed [h2 + p + ul] → Who Is Affected [h2 + p] → Analyst View [blockquote] → My Take [h2 + p — personal analysis] → Key Risks [h2 + p]",
-    "intro_paragraph → Why It Matters Now [h2 + p] → Technical Breakdown [h2 + p + ul] → Industry Reaction [h2 + p] → Contrarian View [blockquote] → My Take [h2 + p — personal analysis] → What To Watch [h2 + p]",
-    "intro_paragraph → The Bigger Picture [h2 + p] → Data In Focus [h2 + p] → Winners And Losers [h2 + p + ul] → Analyst Quote [blockquote] → My Take [h2 + p — personal analysis] → Bottom Line [h2 + p]",
+    "intro_paragraph → Background [h2] → Current Developments [h2 + p + ul] → Market Impact [h2 + p] → Expert Perspective [blockquote] → <!-- PERSONAL_ANALYSIS_PLACEHOLDER --> → Outlook [h2 + p]",
+    "intro_paragraph → The Context [h2 + p] → What Changed [h2 + p + ul] → Who Is Affected [h2 + p] → Analyst View [blockquote] → <!-- PERSONAL_ANALYSIS_PLACEHOLDER --> → Key Risks [h2 + p]",
+    "intro_paragraph → Why It Matters Now [h2 + p] → Technical Breakdown [h2 + p + ul] → Industry Reaction [h2 + p] → Contrarian View [blockquote] → <!-- PERSONAL_ANALYSIS_PLACEHOLDER --> → What To Watch [h2 + p]",
+    "intro_paragraph → The Bigger Picture [h2 + p] → Data In Focus [h2 + p] → Winners And Losers [h2 + p + ul] → Analyst Quote [blockquote] → <!-- PERSONAL_ANALYSIS_PLACEHOLDER --> → Bottom Line [h2 + p]",
 ]
 
 
@@ -416,7 +419,7 @@ ABSOLUTE RULES:
         f"{news_context}\n\n"
         "Instructions:\n"
         "- Reference real news sources naturally inside the article\n"
-        "- Insert <!-- PERSONAL_ANALYSIS_PLACEHOLDER --> exactly where 'My Take' section goes\n"
+        "- Insert the text <!-- PERSONAL_ANALYSIS_PLACEHOLDER --> (exactly as written, no h2 around it) where the personal analysis section belongs\n"
         "- Pure HTML, no Markdown\n"
         "- Be specific and analytical, not generic\n"
         "- Make the intro paragraph memorable — start with a fact, a contrast, or an open question"
