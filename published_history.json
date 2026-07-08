@@ -1,6 +1,7 @@
 {
   "topics": [
-    "The rise of edge computing and its impact on real-time AI applications"
+    "The rise of edge computing and its impact on real-time AI applications",
+    "The economics of cloud computing: hyperscalers and the cost efficiency race"
   ],
   "titles": [
     "Edge AI Revolution",
@@ -75,6 +76,7 @@
     "AI Does Drug Discovery as Biotech Surges",
     "AI Models Reshaping Enterprise Systems",
     "Edge Computing Reshaping AI Apps",
-    "Edge Computing Reshaping AI"
+    "Edge Computing Reshaping AI",
+    "Hyperscalers Reshape Cloud Costs"
   ]
 }
