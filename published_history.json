@@ -2,7 +2,8 @@
   "topics": [
     "Big Tech antitrust regulations: Europe vs. Silicon Valley's legal landscape",
     "Emerging cybersecurity protocols for protecting decentralized financial data",
-    "Digital health transformation: AI diagnostics and remote patient monitoring"
+    "Digital health transformation: AI diagnostics and remote patient monitoring",
+    "Quantum computing milestones and the threat to modern encryption standards"
   ],
   "titles": [
     "Edge AI Revolution",
@@ -91,6 +92,7 @@
     "LLMs Reshaping AI Architectures",
     "EU Regulations Reshape Silicon Valley",
     "Blockchain Faces Cyber Crisis as DeFi Surges",
-    "AI Does Diagnostics as Telehealth Surges"
+    "AI Does Diagnostics as Telehealth Surges",
+    "RSA Faces Quantum: Encryption Crisis"
   ]
 }
