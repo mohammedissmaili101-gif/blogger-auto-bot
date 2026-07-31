@@ -1,17 +1,6 @@
 {
   "topics": [
-    "Big Tech antitrust regulations: Europe vs. Silicon Valley's legal landscape",
-    "Emerging cybersecurity protocols for protecting decentralized financial data",
-    "Digital health transformation: AI diagnostics and remote patient monitoring",
-    "Quantum computing milestones and the threat to modern encryption standards",
-    "Advancements in biotechnology and AI-driven drug discovery efficiency",
-    "Autonomous vehicles and the regulatory road ahead in 2025",
-    "Sustainable energy tech: Next-generation battery storage and hydrogen power",
-    "The economics of cloud computing: hyperscalers and the cost efficiency race",
-    "Open-source AI models vs proprietary systems: the enterprise dilemma",
-    "Latest developments in Generative AI architectures and LLM training costs",
-    "Global semiconductor supply chain shifts and geopolitical impact on tech",
-    "The rise of edge computing and its impact on real-time AI applications"
+    "Quantum computing milestones and the threat to modern encryption standards"
   ],
   "titles": [
     "Edge AI Revolution",
@@ -109,6 +98,7 @@
     "AI Models Reshape Enterprise as Open-Source Surges",
     "LLMs Reshaping AI Dev as Costs Surge",
     "Geopolitics Reshaping Chip Supply",
-    "Edge AI Reshaping IoT"
+    "Edge AI Reshaping IoT",
+    "Quantum Computing Faces RSA: Encryption Crisis"
   ]
 }
