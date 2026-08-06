@@ -5,10 +5,10 @@
     "Advancements in biotechnology and AI-driven drug discovery efficiency",
     "Big Tech antitrust regulations: Europe vs. Silicon Valley's legal landscape",
     "The rise of edge computing and its impact on real-time AI applications",
-    "Digital health transformation: AI diagnostics and remote patient monitoring"
+    "Digital health transformation: AI diagnostics and remote patient monitoring",
+    "Open-source AI models vs proprietary systems: the enterprise dilemma"
   ],
   "titles": [
-    "BioTech Leap",
     "Green Pulse",
     "Health Tech Boom",
     "Cloud Cost Wars",
@@ -107,6 +107,7 @@
     "AI Reshaping Biotech as Drug Discovery Surges",
     "Europe Reshaping Big Tech: Antitrust Crisis",
     "Edge Does AI as Latency Falls",
-    "AI Reshaping Healthcare as Telemed Surges"
+    "AI Reshaping Healthcare as Telemed Surges",
+    "LLMs Reshape Enterprise"
   ]
 }
