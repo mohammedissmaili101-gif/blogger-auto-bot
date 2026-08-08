@@ -7,10 +7,10 @@
     "The rise of edge computing and its impact on real-time AI applications",
     "Digital health transformation: AI diagnostics and remote patient monitoring",
     "Open-source AI models vs proprietary systems: the enterprise dilemma",
-    "Emerging cybersecurity protocols for protecting decentralized financial data"
+    "Emerging cybersecurity protocols for protecting decentralized financial data",
+    "Latest developments in Generative AI architectures and LLM training costs"
   ],
   "titles": [
-    "Health Tech Boom",
     "Cloud Cost Wars",
     "Chip Shift",
     "Tech Law Clash",
@@ -109,6 +109,7 @@
     "Edge Does AI as Latency Falls",
     "AI Reshaping Healthcare as Telemed Surges",
     "LLMs Reshape Enterprise",
-    "DeFi Faces Cyber Crisis as Blockchain Surges"
+    "DeFi Faces Cyber Crisis as Blockchain Surges",
+    "Generative AI Reshaping LLM"
   ]
 }
