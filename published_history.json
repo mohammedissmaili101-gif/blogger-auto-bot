@@ -1,9 +1,9 @@
 {
   "topics": [
-    "Latest developments in Generative AI architectures and LLM training costs"
+    "Latest developments in Generative AI architectures and LLM training costs",
+    "The economics of cloud computing: hyperscalers and the cost efficiency race"
   ],
   "titles": [
-    "Quantum Leap",
     "AI Breakthrough",
     "AI Model Showdown",
     "CryptoGuard",
@@ -102,6 +102,7 @@
     "Hyperscalers Reshape Cloud: Cost Efficiency",
     "Regulators Face AVs: Crisis Ahead",
     "Hydrogen Fuel Does Energy as Storage Surges",
-    "LLMs Reshaping AI Dev"
+    "LLMs Reshaping AI Dev",
+    "Cloud Computing Faces Cost Crisis"
   ]
 }
